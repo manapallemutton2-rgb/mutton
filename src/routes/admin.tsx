@@ -384,36 +384,73 @@ function OrdersTab() {
     staleTime: 30_000,
   });
 
-  // Pre-load buzzer and unlock audio on first user interaction
-  const audioUnlocked = useRef(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Buzzer sound for new orders — try Web Audio API, fallback to HTMLAudioElement
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const buzzerBufferRef = useRef<AudioBuffer | null>(null);
+  const fallbackAudioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    // Pre-create the audio element
-    const audio = new Audio("/buzzer.mp3");
-    audio.load();
-    audioRef.current = audio;
-
-    // Unlock audio on first user interaction (click/tap)
-    const unlock = () => {
-      if (audioUnlocked.current) return;
-      audio
-        .play()
-        .then(() => {
-          audio.pause();
-          audio.currentTime = 0;
-          audioUnlocked.current = true;
-        })
-        .catch(() => {});
+    const initAudio = async () => {
+      try {
+        const resp = await fetch("/buzzer.mp3");
+        const buf = await resp.arrayBuffer();
+        const ACtor =
+          window.AudioContext ||
+          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        if (ACtor) {
+          const ctx = new ACtor();
+          audioCtxRef.current = ctx;
+          ctx
+            .decodeAudioData(buf)
+            .then((audioBuf) => {
+              buzzerBufferRef.current = audioBuf;
+            })
+            .catch(() => {});
+        }
+        const fallback = new Audio();
+        fallback.src = URL.createObjectURL(new Blob([buf], { type: "audio/mpeg" }));
+        fallback.load();
+        fallbackAudioRef.current = fallback;
+      } catch {
+        const fallback = new Audio("/buzzer.mp3");
+        fallback.load();
+        fallbackAudioRef.current = fallback;
+      }
     };
-
-    document.addEventListener("click", unlock, { once: true });
-    document.addEventListener("touchstart", unlock, { once: true });
-
+    initAudio();
+    // Keep AudioContext unlocked on any user interaction
+    const unlock = () => {
+      const ctx = audioCtxRef.current;
+      if (ctx && ctx.state === "suspended") ctx.resume().catch(() => {});
+    };
+    document.addEventListener("click", unlock);
+    document.addEventListener("touchstart", unlock);
     return () => {
       document.removeEventListener("click", unlock);
       document.removeEventListener("touchstart", unlock);
     };
+  }, []);
+
+  const playBuzzer = useCallback(() => {
+    const ctx = audioCtxRef.current;
+    const buf = buzzerBufferRef.current;
+    if (ctx && buf && ctx.state !== "closed") {
+      if (ctx.state === "suspended") {
+        ctx.resume();
+        return;
+      }
+      const source = ctx.createBufferSource();
+      source.buffer = buf;
+      source.connect(ctx.destination);
+      source.start(0);
+      return;
+    }
+    const fb = fallbackAudioRef.current;
+    if (fb) {
+      fb.currentTime = 0;
+      fb.play().catch(() => {});
+    }
+    if (navigator.vibrate) navigator.vibrate(200);
   }, []);
 
   // Real-time listener for new orders
@@ -422,16 +459,9 @@ function OrdersTab() {
       .channel("orders-realtime")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, (payload) => {
         const newOrder = payload.new as Order;
-        // Play buzzer
-        if (audioRef.current) {
-          audioRef.current.currentTime = 0;
-          audioRef.current.play().catch(() => {});
-        }
-        // Show alert
+        playBuzzer();
         setNewOrderAlert(newOrder);
-        // Auto-dismiss after 5 seconds
         setTimeout(() => setNewOrderAlert(null), 5000);
-        // Refresh orders list
         queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
         queryClient.invalidateQueries({ queryKey: ["admin", "order_items"] });
       })
@@ -440,7 +470,7 @@ function OrdersTab() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [queryClient]);
+  }, [queryClient, playBuzzer]);
 
   const isLoading = loadingCommunities || loadingOrders || loadingItems;
 
@@ -449,12 +479,15 @@ function OrdersTab() {
     setPrintScope(scope);
     if (mode === "thermal") document.body.classList.add("printing-thermal");
     setTimeout(() => {
-      window.print();
+      window.scrollTo(0, 0);
       setTimeout(() => {
-        document.body.classList.remove("printing-thermal");
-        setPrintScope(null);
+        window.print();
+        setTimeout(() => {
+          document.body.classList.remove("printing-thermal");
+          setPrintScope(null);
+        }, 500);
       }, 200);
-    }, 100);
+    }, 300);
   }, []);
 
   const doBtPrint = useCallback(

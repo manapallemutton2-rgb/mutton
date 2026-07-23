@@ -198,11 +198,14 @@ function CheckoutPage() {
   const printReceipt = () => {
     document.body.classList.add("printing-thermal");
     setTimeout(() => {
-      window.print();
+      window.scrollTo(0, 0);
       setTimeout(() => {
-        document.body.classList.remove("printing-thermal");
+        window.print();
+        setTimeout(() => {
+          document.body.classList.remove("printing-thermal");
+        }, 500);
       }, 200);
-    }, 100);
+    }, 300);
   };
 
   const btPrint = async () => {
