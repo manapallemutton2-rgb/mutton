@@ -1,0 +1,138 @@
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
+import { User, Phone, ArrowRight } from "lucide-react";
+import { setSession, getRole } from "@/lib/session";
+
+export const Route = createFileRoute("/login")({
+  beforeLoad: () => {
+    if (getRole() === "admin") throw { to: "/admin" };
+    if (getRole() === "user") throw { to: "/shop" };
+  },
+  component: LoginPage,
+  head: () => ({ meta: [{ title: "Login - Manapalle Mutton" }] }),
+});
+
+function LoginPage() {
+  const navigate = useNavigate();
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [error, setError] = useState("");
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    if (!name.trim()) {
+      setError("Please enter your name");
+      return;
+    }
+    if (!/^\d{10}$/.test(phone)) {
+      setError("Enter a valid 10-digit mobile number");
+      return;
+    }
+    setSession(name.trim(), phone, "user");
+    navigate({ to: "/shop" });
+  };
+
+  return (
+    <div className="flex min-h-screen">
+      {/* Left: Hero Image */}
+      <div className="relative hidden w-1/2 lg:block">
+        <img
+          src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&h=1200&fit=crop"
+          alt="Fresh meat display"
+          className="h-full w-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+        <div className="absolute bottom-12 left-12 text-white">
+          <img src="/MM.jpeg" alt="Logo" className="mb-4 h-16 w-16 rounded-2xl object-contain" />
+          <h2 className="text-4xl font-bold">Manapalle Mutton</h2>
+          <p className="mt-3 max-w-sm text-lg text-white/80">
+            Fresh meat delivered to your community. Quality cuts, honest prices, doorstep delivery.
+          </p>
+        </div>
+      </div>
+
+      {/* Right: Form */}
+      <div className="flex w-full items-center justify-center px-4 sm:px-6 lg:w-1/2">
+        <div className="w-full max-w-md">
+          {/* Mobile logo */}
+          <div className="mb-8 text-center lg:hidden">
+            <img
+              src="/MM.jpeg"
+              alt="Logo"
+              className="mx-auto mb-3 h-20 w-20 rounded-2xl object-contain shadow-lg"
+            />
+            <h1 className="text-3xl font-bold text-primary">Manapalle Mutton</h1>
+          </div>
+
+          <div className="mb-8">
+            <h1 className="text-4xl font-bold tracking-tight">Welcome back</h1>
+            <p className="mt-2 text-lg text-muted-foreground">
+              Enter your details to start ordering
+            </p>
+          </div>
+
+          <form onSubmit={handleLogin} className="space-y-5">
+            <div>
+              <label className="mb-2 block text-base font-medium">Your Name</label>
+              <div className="flex items-center overflow-hidden rounded-xl border bg-background transition focus-within:ring-2 focus-within:ring-primary">
+                <span className="pl-5">
+                  <User className="h-5 w-5 text-muted-foreground" />
+                </span>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Enter your name"
+                  className="w-full bg-transparent px-4 py-4 text-base outline-none"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-base font-medium">Mobile Number</label>
+              <div className="flex items-center overflow-hidden rounded-xl border bg-background transition focus-within:ring-2 focus-within:ring-primary">
+                <span className="flex items-center border-r bg-muted px-4 py-4 text-base text-muted-foreground">
+                  +91
+                </span>
+                <span className="pl-4">
+                  <Phone className="h-5 w-5 text-muted-foreground" />
+                </span>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+                  placeholder="10-digit mobile number"
+                  className="w-full bg-transparent px-3 py-4 text-base outline-none"
+                />
+              </div>
+            </div>
+
+            {error && (
+              <div className="rounded-xl bg-destructive/10 px-5 py-4 text-base text-destructive">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className="flex w-full items-center justify-center gap-3 rounded-xl bg-primary py-4 text-lg font-semibold text-primary-foreground transition hover:opacity-90 active:scale-[0.98]"
+            >
+              Start Shopping
+              <ArrowRight className="h-5 w-5" />
+            </button>
+          </form>
+
+          <p className="mt-8 text-center text-sm text-muted-foreground">
+            <a href="/admin-login" className="font-medium text-primary hover:underline">
+              Admin Login
+            </a>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
