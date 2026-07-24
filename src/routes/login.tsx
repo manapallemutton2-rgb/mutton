@@ -61,7 +61,10 @@ function LoginPage() {
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
         <div className="absolute bottom-12 left-12 text-white">
           <img src="/MM.jpeg" alt="Logo" className="mb-4 h-16 w-16 rounded-2xl object-contain" />
-          <h2 className="text-4xl font-bold">Manapalle Mutton</h2>
+          <h2 className="text-4xl font-bold leading-tight">
+            Manapalle
+            <span className="block text-xl font-medium opacity-80">Mutton & Chicken</span>
+          </h2>
           <p className="mt-3 max-w-sm text-lg text-white/80">
             Fresh meat delivered to your community. Quality cuts, honest prices, doorstep delivery.
           </p>
@@ -71,18 +74,22 @@ function LoginPage() {
       {/* Right: Form */}
       <div className="flex w-full items-center justify-center px-4 sm:px-6 lg:w-1/2">
         <div className="w-full max-w-md">
-          {/* Mobile logo */}
-          <div className="mb-8 text-center lg:hidden">
+          <div className="mb-8 text-center">
             <img
               src="/MM.jpeg"
               alt="Logo"
               className="mx-auto mb-3 h-20 w-20 rounded-2xl object-contain shadow-lg"
             />
-            <h1 className="text-3xl font-bold text-primary">Manapalle Mutton</h1>
+            <h1 className="text-3xl font-bold text-primary leading-tight sm:text-4xl">
+              Manapalle
+              <span className="block text-lg font-medium opacity-80 sm:text-xl">
+                Mutton & Chicken
+              </span>
+            </h1>
           </div>
 
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold tracking-tight">Welcome back</h1>
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Welcome back</h1>
             <p className="mt-2 text-lg text-muted-foreground">
               Enter your details to start ordering
             </p>

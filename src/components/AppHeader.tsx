@@ -118,7 +118,10 @@ export function AppHeader({ title }: { title?: string }) {
             alt="Logo"
             className="h-9 w-9 rounded-xl object-contain shadow-sm sm:h-10 sm:w-10"
           />
-          <span className="truncate">Manapalle Mutton</span>
+          <span className="truncate">
+            Manapalle
+            <span className="text-base font-normal opacity-70"> Mutton & Chicken</span>
+          </span>
           {title && (
             <span className="hidden text-base font-normal text-muted-foreground sm:inline">
               / {title}

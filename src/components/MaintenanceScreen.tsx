@@ -9,7 +9,10 @@ export function MaintenanceScreen({ message }: { message?: string }) {
           alt="Logo"
           className="mx-auto mb-6 h-24 w-24 rounded-2xl object-contain shadow-lg"
         />
-        <h1 className="text-4xl font-bold text-primary">Manapalle Mutton</h1>
+        <h1 className="text-4xl font-bold text-primary leading-tight">
+          Manapalle
+          <span className="block text-xl font-medium opacity-80">Mutton & Chicken</span>
+        </h1>
         <div className="mt-8 rounded-2xl border bg-card p-10 shadow-sm">
           <Wrench className="mx-auto mb-6 h-16 w-16 text-orange-500" />
           <h2 className="text-2xl font-semibold">Under Maintenance</h2>

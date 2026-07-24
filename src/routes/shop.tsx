@@ -62,13 +62,18 @@ function ShopPage() {
       const { data, error } = await supabase
         .from("products")
         .select("id, name, unit, price, image_url, active, created_at, stock")
-        .eq("active", true)
-        .order("name");
+        .eq("active", true);
       if (error) {
         console.error("Failed to load products:", error);
         return [];
       }
-      return (data as Product[]) || [];
+      return ((data as Product[]) || []).sort((a, b) => {
+        const aIsMutton = a.name.toLowerCase().startsWith("mutton");
+        const bIsMutton = b.name.toLowerCase().startsWith("mutton");
+        if (aIsMutton && !bIsMutton) return -1;
+        if (!aIsMutton && bIsMutton) return 1;
+        return a.name.localeCompare(b.name);
+      });
     },
   });
 

@@ -56,7 +56,9 @@ function AdminLoginPage() {
             className="mx-auto mb-3 h-20 w-20 rounded-xl object-contain"
           />
           <h1 className="text-2xl font-bold text-primary">Admin Panel</h1>
-          <p className="text-sm text-muted-foreground">Manapalle Mutton</p>
+          <p className="text-sm text-muted-foreground">
+            Manapalle <span className="text-xs opacity-70">Mutton & Chicken</span>
+          </p>
         </div>
 
         <div className="mb-5 rounded-lg border bg-orange-50 px-4 py-3 text-xs text-orange-700 dark:bg-orange-950 dark:text-orange-300">

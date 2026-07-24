@@ -29,7 +29,10 @@ function Index() {
           alt="Manapalle Mutton"
           className="mx-auto mb-4 h-24 w-24 rounded-2xl object-contain shadow-lg"
         />
-        <h1 className="text-4xl font-bold text-primary">Manapalle Mutton</h1>
+        <h1 className="text-4xl font-bold text-primary leading-tight">
+          Manapalle
+          <span className="block text-xl font-medium opacity-80">Mutton & Chicken</span>
+        </h1>
         <p className="mt-4 text-xl text-muted-foreground animate-pulse-soft">Loading...</p>
       </div>
     </div>
