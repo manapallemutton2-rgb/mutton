@@ -1,16 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  CheckCircle,
-  ArrowLeft,
-  Bluetooth,
-  MapPin,
-  Home,
-  FileText,
-  Truck,
-  Download,
-} from "lucide-react";
+import { CheckCircle, ArrowLeft, Bluetooth, MapPin, Home, FileText, Truck } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { supabase } from "@/integrations/supabase/client";
 import { CartItem, cartTotal, clearCart, getCart } from "@/lib/cart";
@@ -53,7 +44,6 @@ function CheckoutPage() {
   const [doneItems, setDoneItems] = useState<
     { product_name: string; unit: string; price: number; quantity: number }[]
   >([]);
-  const receiptRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const update = () => {
@@ -239,16 +229,6 @@ function CheckoutPage() {
     if (!ok) alert("Print failed. Please check the printer connection.");
   };
 
-  const saveReceipt = async () => {
-    if (!receiptRef.current) return;
-    const html2canvas = (await import("html2canvas")).default;
-    const canvas = await html2canvas(receiptRef.current, { scale: 2, useCORS: true });
-    const link = document.createElement("a");
-    link.download = `receipt-${done}.png`;
-    link.href = canvas.toDataURL();
-    link.click();
-  };
-
   if (done) {
     return (
       <div className="min-h-screen bg-background">
@@ -277,12 +257,9 @@ function CheckoutPage() {
                     <Bluetooth className="h-5 w-5 sm:h-6 sm:w-6" /> Print via Bluetooth
                   </button>
                 )}
-                <button
-                  onClick={saveReceipt}
-                  className="flex items-center justify-center gap-3 rounded-xl border bg-card px-6 py-3.5 text-base font-semibold transition hover:shadow-md sm:px-8 sm:py-4 sm:text-lg"
-                >
-                  <Download className="h-5 w-5 sm:h-6 sm:w-6" /> Save Receipt
-                </button>
+                <p className="text-sm text-muted-foreground sm:text-base">
+                  Please take a screenshot of this page for your records.
+                </p>
               </>
             )}
             <button
@@ -294,7 +271,7 @@ function CheckoutPage() {
           </div>
         </main>
         {doneOrder && (
-          <div className="thermal-only" ref={receiptRef}>
+          <div className="thermal-only">
             <div className="thermal-page">
               <div className="thermal-receipt">
                 <div style={{ textAlign: "center" }}>

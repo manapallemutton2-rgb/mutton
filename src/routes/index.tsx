@@ -33,6 +33,9 @@ function Index() {
           Manapalle
           <span className="block text-xl font-medium opacity-80">Mutton & Chicken</span>
         </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Fresh from the Village, Straight to Your Home
+        </p>
         <p className="mt-4 text-xl text-muted-foreground animate-pulse-soft">Loading...</p>
       </div>
     </div>

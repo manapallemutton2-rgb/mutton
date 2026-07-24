@@ -18,13 +18,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         name: "description",
         content:
-          "Order fresh meat delivered to your community. Simple mobile login, checkout by community & block.",
+          "Fresh from the Village, Straight to Your Home. Order fresh meat delivered to your community.",
       },
       { property: "og:title", content: "Manapalle Mutton - Order Fresh Meat Online" },
       {
         property: "og:description",
         content:
-          "Order fresh meat delivered to your community. Simple mobile login, checkout by community & block.",
+          "Fresh from the Village, Straight to Your Home. Order fresh meat delivered to your community.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -32,7 +32,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         name: "twitter:description",
         content:
-          "Order fresh meat delivered to your community. Simple mobile login, checkout by community & block.",
+          "Fresh from the Village, Straight to Your Home. Order fresh meat delivered to your community.",
       },
     ],
     links: [

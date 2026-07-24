@@ -59,6 +59,9 @@ function AdminLoginPage() {
           <p className="text-sm text-muted-foreground">
             Manapalle <span className="text-xs opacity-70">Mutton & Chicken</span>
           </p>
+          <p className="mt-1 text-xs text-muted-foreground/70">
+            Fresh from the Village, Straight to Your Home
+          </p>
         </div>
 
         <div className="mb-5 rounded-lg border bg-orange-50 px-4 py-3 text-xs text-orange-700 dark:bg-orange-950 dark:text-orange-300">

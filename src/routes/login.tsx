@@ -66,7 +66,7 @@ function LoginPage() {
             <span className="block text-xl font-medium opacity-80">Mutton & Chicken</span>
           </h2>
           <p className="mt-3 max-w-sm text-lg text-white/80">
-            Fresh meat delivered to your community. Quality cuts, honest prices, doorstep delivery.
+            Fresh from the Village, Straight to Your Home
           </p>
         </div>
       </div>
@@ -86,6 +86,9 @@ function LoginPage() {
                 Mutton & Chicken
               </span>
             </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Fresh from the Village, Straight to Your Home
+            </p>
           </div>
 
           <div className="mb-6">
