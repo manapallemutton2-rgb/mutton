@@ -5,6 +5,11 @@ async function getAdminClient() {
   return supabaseAdmin;
 }
 
+type ProductUpdateInput = {
+  id: string;
+  updates: Record<string, unknown>;
+};
+
 export const adminUpdateProduct = createServerFn({ method: "POST" })
   .validator((data: unknown) => {
     const d = data as Record<string, unknown>;
@@ -16,7 +21,10 @@ export const adminUpdateProduct = createServerFn({ method: "POST" })
   })
   .handler(async ({ data }) => {
     const admin = await getAdminClient();
-    const { error } = await admin.from("products").update(data.updates).eq("id", data.id);
+    const { error } = await admin
+      .from("products")
+      .update(data.updates as never)
+      .eq("id", data.id);
     if (error) throw new Error(error.message);
     return { success: true };
   });
@@ -37,11 +45,13 @@ export const adminDeleteProduct = createServerFn({ method: "POST" })
 export const adminInsertProduct = createServerFn({ method: "POST" })
   .validator((data: unknown) => {
     const d = data as Record<string, unknown>;
+    const stock = d.stock !== undefined && d.stock !== "" ? Number(d.stock) : null;
     return {
       name: String(d.name || ""),
       unit: String(d.unit || "kg"),
       price: Number(d.price),
       image_url: d.image_url ? String(d.image_url) : null,
+      stock: stock,
       active: true,
     };
   })

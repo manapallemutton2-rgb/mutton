@@ -178,6 +178,7 @@ export type Database = {
           price: number;
           unit: string;
           image_url?: string | null;
+          stock?: number | null;
         };
         Insert: {
           active?: boolean;
@@ -187,6 +188,7 @@ export type Database = {
           price: number;
           unit?: string;
           image_url?: string | null;
+          stock?: number | null;
         };
         Update: {
           active?: boolean;
@@ -196,6 +198,7 @@ export type Database = {
           price?: number;
           unit?: string;
           image_url?: string | null;
+          stock?: number | null;
         };
         Relationships: [];
       };

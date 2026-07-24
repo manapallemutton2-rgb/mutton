@@ -1,7 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Minus, Plus, Trash2, ShoppingBag } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
+import { supabase } from "@/integrations/supabase/client";
 import { CartItem, cartTotal, getCart, removeFromCart, updateQty } from "@/lib/cart";
 import { getPhone } from "@/lib/session";
 
@@ -13,6 +15,22 @@ export const Route = createFileRoute("/cart")({
 function CartPage() {
   const navigate = useNavigate();
   const [items, setItems] = useState<CartItem[]>([]);
+
+  const { data: settings = {} } = useQuery<Record<string, string>>({
+    queryKey: ["settings"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("settings").select("*");
+      if (error) return {};
+      const map: Record<string, string> = {};
+      (data || []).forEach((s) => {
+        map[s.key] = s.value;
+      });
+      return map;
+    },
+    staleTime: 30_000,
+  });
+
+  const ordersOpen = settings.orders_open !== "false";
 
   useEffect(() => {
     const update = () => {
@@ -38,6 +56,11 @@ function CartPage() {
     <div className="min-h-screen bg-background">
       <AppHeader title="Cart" />
       <main className="mx-auto max-w-3xl px-3 py-4 sm:px-4 sm:py-6">
+        {!ordersOpen && (
+          <div className="mb-4 rounded-xl border-2 border-red-300 bg-red-50 p-4 text-center text-base font-semibold text-red-700">
+            Orders are currently closed. You cannot place orders right now.
+          </div>
+        )}
         <Link
           to="/shop"
           className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground transition hover:text-foreground sm:mb-6 sm:text-base"

@@ -1,21 +1,22 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   CheckCircle,
-  Receipt,
   ArrowLeft,
   Bluetooth,
   MapPin,
   Home,
   FileText,
   Truck,
+  Download,
 } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { supabase } from "@/integrations/supabase/client";
 import { CartItem, cartTotal, clearCart, getCart } from "@/lib/cart";
 import { getPhone, getName } from "@/lib/session";
 import { isPrinterConnected, printReceipt as btPrintReceipt } from "@/lib/bt-printer";
+import { placeOrderWithStockCheck } from "@/lib/place-order.server";
 
 type Community = { id: string; name: string };
 type Block = { id: string; community_id: string; name: string };
@@ -52,6 +53,7 @@ function CheckoutPage() {
   const [doneItems, setDoneItems] = useState<
     { product_name: string; unit: string; price: number; quantity: number }[]
   >([]);
+  const receiptRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const update = () => {
@@ -69,6 +71,25 @@ function CheckoutPage() {
       window.removeEventListener("session-updated", update);
     };
   }, [navigate]);
+
+  const { data: settings, isLoading: loadingSettings } = useQuery<Record<string, string>>({
+    queryKey: ["settings"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("settings").select("*");
+      if (error) {
+        console.error("Failed to load settings:", error);
+        return {};
+      }
+      const map: Record<string, string> = {};
+      (data || []).forEach((s) => {
+        map[s.key] = s.value;
+      });
+      return map;
+    },
+    staleTime: 30_000,
+  });
+
+  const ordersOpen = settings?.orders_open !== "false";
 
   const { data: communities = [] } = useQuery<Community[]>({
     queryKey: ["communities"],
@@ -105,35 +126,30 @@ function CheckoutPage() {
       const block = blocks.find((b) => b.id === blockId);
       if (!community || !block) throw new Error("Invalid community or block selection");
 
-      const { data: order, error: oErr } = await supabase
-        .from("orders")
-        .insert({
-          phone,
-          customer_name: customerName,
-          flat_no: flatNo,
-          alt_phone: altPhone || null,
-          packing_note: packingNote || null,
-          community_id: communityId,
-          block_id: blockId,
-          community_name: community.name,
-          block_name: block.name,
-          total: cartTotal(items),
-          status: "pending",
-        })
-        .select()
-        .single();
-      if (oErr || !order) throw new Error(oErr?.message || "Failed to place order");
-      const orderItems = items.map((i) => ({
-        order_id: order.id,
-        product_id: i.product_id,
-        product_name: i.name,
-        unit: i.unit,
-        price: i.price,
-        quantity: i.quantity,
-      }));
-      const { error: iErr } = await supabase.from("order_items").insert(orderItems);
-      if (iErr) throw new Error(iErr.message);
-      return order.order_number as string;
+      const result = await placeOrderWithStockCheck({
+        data: {
+          order: {
+            phone,
+            customer_name: customerName,
+            flat_no: flatNo,
+            alt_phone: altPhone || null,
+            packing_note: packingNote || null,
+            community_id: communityId,
+            block_id: blockId,
+            community_name: community.name,
+            block_name: block.name,
+            total: cartTotal(items),
+          },
+          items: items.map((i) => ({
+            product_id: i.product_id,
+            product_name: i.name,
+            unit: i.unit,
+            price: i.price,
+            quantity: i.quantity,
+          })),
+        },
+      });
+      return result.orderNumber;
     },
     onSuccess: (orderNumber) => {
       clearCart();
@@ -164,6 +180,7 @@ function CheckoutPage() {
         })),
       );
       queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["products", "active"] });
     },
     onError: (err: Error) => {
       setError(err.message);
@@ -176,6 +193,10 @@ function CheckoutPage() {
   const placeOrder = (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    if (!ordersOpen) {
+      setError("Orders are currently closed. Please try again later.");
+      return;
+    }
     if (!communityId || !blockId) {
       setError("Please select your community and block");
       return;
@@ -193,19 +214,6 @@ function CheckoutPage() {
       return;
     }
     placeOrderMutation.mutate();
-  };
-
-  const printReceipt = () => {
-    document.body.classList.add("printing-thermal");
-    setTimeout(() => {
-      window.scrollTo(0, 0);
-      setTimeout(() => {
-        window.print();
-        setTimeout(() => {
-          document.body.classList.remove("printing-thermal");
-        }, 500);
-      }, 200);
-    }, 300);
   };
 
   const btPrint = async () => {
@@ -229,6 +237,16 @@ function CheckoutPage() {
       date: new Date(doneOrder.created_at).toLocaleString(),
     });
     if (!ok) alert("Print failed. Please check the printer connection.");
+  };
+
+  const saveReceipt = async () => {
+    if (!receiptRef.current) return;
+    const html2canvas = (await import("html2canvas")).default;
+    const canvas = await html2canvas(receiptRef.current, { scale: 2, useCORS: true });
+    const link = document.createElement("a");
+    link.download = `receipt-${done}.png`;
+    link.href = canvas.toDataURL();
+    link.click();
   };
 
   if (done) {
@@ -260,10 +278,10 @@ function CheckoutPage() {
                   </button>
                 )}
                 <button
-                  onClick={printReceipt}
+                  onClick={saveReceipt}
                   className="flex items-center justify-center gap-3 rounded-xl border bg-card px-6 py-3.5 text-base font-semibold transition hover:shadow-md sm:px-8 sm:py-4 sm:text-lg"
                 >
-                  <Receipt className="h-5 w-5 sm:h-6 sm:w-6" /> Print Receipt
+                  <Download className="h-5 w-5 sm:h-6 sm:w-6" /> Save Receipt
                 </button>
               </>
             )}
@@ -276,7 +294,7 @@ function CheckoutPage() {
           </div>
         </main>
         {doneOrder && (
-          <div className="thermal-only">
+          <div className="thermal-only" ref={receiptRef}>
             <div className="thermal-page">
               <div className="thermal-receipt">
                 <div style={{ textAlign: "center" }}>
@@ -509,10 +527,14 @@ function CheckoutPage() {
                 </div>
               )}
               <button
-                disabled={placeOrderMutation.isPending}
+                disabled={placeOrderMutation.isPending || !ordersOpen}
                 className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-base font-semibold text-primary-foreground transition hover:opacity-90 active:scale-[0.98] disabled:opacity-50 sm:mt-6 sm:py-4 sm:text-lg"
               >
-                {placeOrderMutation.isPending ? "Placing Order..." : "Place Order"}
+                {placeOrderMutation.isPending
+                  ? "Placing Order..."
+                  : !ordersOpen
+                    ? "Orders Closed"
+                    : "Place Order"}
               </button>
             </div>
           </div>

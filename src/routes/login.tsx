@@ -1,7 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { User, Phone, ArrowRight } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { User, Phone, ArrowRight, Megaphone } from "lucide-react";
 import { setSession, getRole } from "@/lib/session";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/login")({
   beforeLoad: () => {
@@ -17,6 +19,20 @@ function LoginPage() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [error, setError] = useState("");
+
+  const { data: settings = {} } = useQuery<Record<string, string>>({
+    queryKey: ["settings"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("settings").select("*");
+      if (error) return {};
+      const map: Record<string, string> = {};
+      (data || []).forEach((s) => {
+        map[s.key] = s.value;
+      });
+      return map;
+    },
+    staleTime: 30_000,
+  });
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,6 +87,30 @@ function LoginPage() {
               Enter your details to start ordering
             </p>
           </div>
+
+          {/* Admin Message */}
+          {settings.popup_message && (
+            <div className="mb-6 rounded-xl border-2 border-primary/20 bg-primary/5 p-4">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                  <Megaphone className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <p className="text-lg font-bold text-primary">{settings.popup_message}</p>
+                  {settings.popup_sheep && (
+                    <p className="mt-1 text-lg font-bold text-muted-foreground">
+                      No of Sheeps: {settings.popup_sheep}
+                    </p>
+                  )}
+                  {settings.popup_users && (
+                    <p className="text-lg font-bold text-muted-foreground">
+                      Active Users: {settings.popup_users}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           <form onSubmit={handleLogin} className="space-y-5">
             <div>

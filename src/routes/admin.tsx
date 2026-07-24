@@ -13,6 +13,8 @@ import {
   Power,
   PowerOff,
   Bluetooth,
+  ShoppingCart,
+  Megaphone,
 } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { supabase } from "@/integrations/supabase/client";
@@ -38,6 +40,7 @@ type Product = {
   price: number;
   active: boolean;
   image_url?: string | null;
+  stock?: number | null;
 };
 type Community = { id: string; name: string };
 type Block = { id: string; community_id: string; name: string };
@@ -140,7 +143,10 @@ function StatsTab() {
   const { data: products = [], isLoading: loadingProducts } = useQuery<Product[]>({
     queryKey: ["admin", "products"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("products").select("*").order("name");
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, name, unit, price, image_url, active, created_at, stock")
+        .order("name");
       if (error) {
         console.error("Failed to load products:", error);
         return [];
@@ -241,7 +247,7 @@ function StatsTab() {
       {/* Today */}
       <div className="rounded-xl border bg-card p-6">
         <h3 className="mb-3 text-lg font-semibold">Today's Summary</h3>
-        <div className="flex gap-8 text-base">
+        <div className="flex flex-wrap gap-4 text-base sm:gap-8">
           <span className="font-medium">{todayOrders.length} orders</span>
           <span className="font-bold text-primary">INR {todayRevenue.toFixed(0)} revenue</span>
         </div>
@@ -281,8 +287,8 @@ function StatsTab() {
       </div>
 
       {/* Block Stats */}
-      <div className="rounded-lg border bg-card p-4">
-        <h3 className="mb-3 font-semibold">By Block</h3>
+      <div className="rounded-xl border bg-card p-6">
+        <h3 className="mb-4 text-lg font-semibold">By Block</h3>
         {blockStats.length === 0 ? (
           <p className="text-sm text-muted-foreground">No orders yet.</p>
         ) : (
@@ -314,9 +320,9 @@ function StatsTab() {
       </div>
 
       {/* Product Stats */}
-      <div className="rounded-lg border bg-card p-4">
-        <h3 className="mb-3 font-semibold">Products</h3>
-        <div className="flex gap-4 text-sm">
+      <div className="rounded-xl border bg-card p-6">
+        <h3 className="mb-4 text-lg font-semibold">Products</h3>
+        <div className="flex gap-4 text-base">
           <span>{products.length} total</span>
           <span>{products.filter((p) => p.active).length} active</span>
           <span>{products.filter((p) => !p.active).length} inactive</span>
@@ -341,6 +347,36 @@ function OrdersTab() {
   const [printScope, setPrintScope] = useState<PrintScope>(null);
   const [page, setPage] = useState(0);
   const [newOrderAlert, setNewOrderAlert] = useState<Order | null>(null);
+  const { data: settings = {} } = useQuery<Record<string, string>>({
+    queryKey: ["admin", "orders-settings"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("settings").select("*");
+      if (error) return {};
+      const map: Record<string, string> = {};
+      (data || []).forEach((s) => {
+        map[s.key] = s.value;
+      });
+      return map;
+    },
+    staleTime: 30_000,
+  });
+
+  const ordersOpen = settings.orders_open !== "false";
+  const isMaintenance = settings.maintenance_mode === "true";
+
+  const toggleOrdersOpen = async () => {
+    const newValue = ordersOpen ? "false" : "true";
+    await adminUpdateSettings({ data: { key: "orders_open", value: newValue } });
+    queryClient.invalidateQueries({ queryKey: ["admin", "orders-settings"] });
+    queryClient.invalidateQueries({ queryKey: ["admin", "settings"] });
+  };
+
+  const toggleMaintenance = async () => {
+    const newValue = isMaintenance ? "false" : "true";
+    await adminUpdateSettings({ data: { key: "maintenance_mode", value: newValue } });
+    queryClient.invalidateQueries({ queryKey: ["admin", "orders-settings"] });
+    queryClient.invalidateQueries({ queryKey: ["admin", "settings"] });
+  };
 
   const { data: communities = [], isLoading: loadingCommunities } = useQuery<Community[]>({
     queryKey: ["admin", "communities"],
@@ -693,6 +729,54 @@ function OrdersTab() {
           groupByBlock={printScope.kind === "community"}
         />
       )}
+
+      {/* Toggle switches */}
+      <div className="no-print mb-4 flex flex-wrap gap-3">
+        <div className="flex items-center gap-3 rounded-xl border bg-card px-5 py-3">
+          <div className="flex items-center gap-2">
+            {ordersOpen ? (
+              <ShoppingCart className="h-5 w-5 text-green-500" />
+            ) : (
+              <ShoppingCart className="h-5 w-5 text-red-500" />
+            )}
+            <span className="text-base font-semibold">Accept Orders</span>
+          </div>
+          <button
+            onClick={toggleOrdersOpen}
+            className={`relative h-8 w-14 rounded-full transition-colors ${
+              ordersOpen ? "bg-green-500" : "bg-red-500"
+            }`}
+          >
+            <span
+              className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                ordersOpen ? "left-1" : "left-7"
+              }`}
+            />
+          </button>
+        </div>
+        <div className="flex items-center gap-3 rounded-xl border bg-card px-5 py-3">
+          <div className="flex items-center gap-2">
+            {!isMaintenance ? (
+              <Power className="h-5 w-5 text-green-500" />
+            ) : (
+              <PowerOff className="h-5 w-5 text-red-500" />
+            )}
+            <span className="text-base font-semibold">Maintenance</span>
+          </div>
+          <button
+            onClick={toggleMaintenance}
+            className={`relative h-8 w-14 rounded-full transition-colors ${
+              !isMaintenance ? "bg-green-500" : "bg-red-500"
+            }`}
+          >
+            <span
+              className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                !isMaintenance ? "left-1" : "left-7"
+              }`}
+            />
+          </button>
+        </div>
+      </div>
 
       <div className="no-print mt-8">
         <div className="no-print mb-4 flex items-center justify-between">
@@ -1061,13 +1145,17 @@ function ProductsTab() {
   const [name, setName] = useState("");
   const [unit, setUnit] = useState("kg");
   const [price, setPrice] = useState("");
+  const [stock, setStock] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [uploadingId, setUploadingId] = useState<string | null>(null);
 
   const { data: products = [], isLoading } = useQuery<Product[]>({
     queryKey: ["admin", "products"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("products").select("*").order("name");
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, name, unit, price, image_url, active, created_at, stock")
+        .order("name");
       if (error) {
         console.error("Failed to load products:", error);
         return [];
@@ -1080,12 +1168,19 @@ function ProductsTab() {
   const addMutation = useMutation({
     mutationFn: async () => {
       await adminInsertProduct({
-        data: { name: name.trim(), unit, price: Number(price), image_url: imageUrl.trim() || null },
+        data: {
+          name: name.trim(),
+          unit,
+          price: Number(price),
+          stock: stock || null,
+          image_url: imageUrl.trim() || null,
+        },
       });
     },
     onSuccess: () => {
       setName("");
       setPrice("");
+      setStock("");
       setImageUrl("");
       queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
       queryClient.invalidateQueries({ queryKey: ["products", "active"] });
@@ -1122,6 +1217,7 @@ function ProductsTab() {
         name?: string;
         unit?: string;
         price?: number;
+        stock?: number | null;
         active?: boolean;
         image_url?: string | null;
       };
@@ -1219,7 +1315,7 @@ function ProductsTab() {
     <div>
       <form
         onSubmit={add}
-        className="mb-5 grid gap-3 rounded-xl border bg-card p-4 sm:p-6 sm:grid-cols-2 md:grid-cols-5"
+        className="mb-5 grid gap-3 rounded-xl border bg-card p-4 sm:p-6 sm:grid-cols-2 md:grid-cols-6"
       >
         <input
           value={name}
@@ -1245,6 +1341,14 @@ function ProductsTab() {
           className="rounded-xl border bg-background px-4 py-4 text-base"
         />
         <input
+          value={stock}
+          onChange={(e) => setStock(e.target.value)}
+          placeholder="Stock (empty = unlimited)"
+          type="text"
+          inputMode="decimal"
+          className="rounded-xl border bg-background px-4 py-4 text-base"
+        />
+        <input
           value={imageUrl}
           onChange={(e) => setImageUrl(e.target.value)}
           placeholder="Image URL (optional)"
@@ -1267,6 +1371,7 @@ function ProductsTab() {
               <th className="p-3">Name</th>
               <th className="p-3">Unit</th>
               <th className="p-3">Price</th>
+              <th className="p-3">Stock</th>
               <th className="p-3">Active</th>
               <th className="p-3">Image Options</th>
               <th className="p-3 text-right">Actions</th>
@@ -1312,6 +1417,25 @@ function ProductsTab() {
                     defaultValue={p.price}
                     onBlur={(e) => updatePrice(p, e.target.value)}
                     type="number"
+                    className="w-28 rounded-xl border bg-background px-3 py-2 text-base"
+                  />
+                </td>
+                <td className="p-3">
+                  <input
+                    defaultValue={p.stock ?? ""}
+                    onBlur={(e) => {
+                      const v = e.target.value.trim();
+                      if (v === "" || v === p.stock?.toString()) return;
+                      const num = Number(v);
+                      if (v !== "" && (isNaN(num) || num < 0)) return;
+                      updateProductMutation.mutate({
+                        id: p.id,
+                        updates: { stock: v === "" ? null : num },
+                      });
+                    }}
+                    placeholder="Unlimited"
+                    type="text"
+                    inputMode="decimal"
                     className="w-28 rounded-xl border bg-background px-3 py-2 text-base"
                   />
                 </td>
@@ -1554,6 +1678,10 @@ function SettingsTab() {
   const queryClient = useQueryClient();
   const [maintenanceMsg, setMaintenanceMsg] = useState("");
   const [saved, setSaved] = useState(false);
+  const [popupSheep, setPopupSheep] = useState("");
+  const [popupUsers, setPopupUsers] = useState("");
+  const [popupMsg, setPopupMsg] = useState("");
+  const [popupSaved, setPopupSaved] = useState(false);
 
   const { data: settings = {}, isLoading } = useQuery<Record<string, string>>({
     queryKey: ["admin", "settings"],
@@ -1573,14 +1701,29 @@ function SettingsTab() {
   });
 
   const isMaintenance = settings.maintenance_mode === "true";
+  const ordersOpen = settings.orders_open !== "false";
 
   useEffect(() => {
     setMaintenanceMsg(settings.maintenance_message || "");
-  }, [settings.maintenance_message]);
+    setPopupSheep(settings.popup_sheep || "");
+    setPopupUsers(settings.popup_users || "");
+    setPopupMsg(settings.popup_message || "Grab it faster!");
+  }, [
+    settings.maintenance_message,
+    settings.popup_sheep,
+    settings.popup_users,
+    settings.popup_message,
+  ]);
 
   const toggleMaintenance = async () => {
     const newValue = isMaintenance ? "false" : "true";
     await adminUpdateSettings({ data: { key: "maintenance_mode", value: newValue } });
+    queryClient.invalidateQueries({ queryKey: ["admin", "settings"] });
+  };
+
+  const toggleOrdersOpen = async () => {
+    const newValue = ordersOpen ? "false" : "true";
+    await adminUpdateSettings({ data: { key: "orders_open", value: newValue } });
     queryClient.invalidateQueries({ queryKey: ["admin", "settings"] });
   };
 
@@ -1589,6 +1732,17 @@ function SettingsTab() {
     queryClient.invalidateQueries({ queryKey: ["admin", "settings"] });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  };
+
+  const savePopup = async () => {
+    await adminUpdateSettings({ data: { key: "popup_sheep", value: popupSheep } });
+    await adminUpdateSettings({ data: { key: "popup_users", value: popupUsers } });
+    await adminUpdateSettings({
+      data: { key: "popup_message", value: popupMsg || "Grab it faster!" },
+    });
+    queryClient.invalidateQueries({ queryKey: ["admin", "settings"] });
+    setPopupSaved(true);
+    setTimeout(() => setPopupSaved(false), 2000);
   };
 
   if (isLoading)
@@ -1600,6 +1754,121 @@ function SettingsTab() {
 
   return (
     <div className="space-y-6">
+      {/* Accept Orders */}
+      <div className="rounded-xl border bg-card p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="flex items-center gap-2 text-xl font-semibold">
+              {ordersOpen ? (
+                <ShoppingCart className="h-6 w-6 text-green-500" />
+              ) : (
+                <ShoppingCart className="h-6 w-6 text-red-500" />
+              )}
+              Accept Orders
+            </h3>
+            <p className="mt-2 text-base text-muted-foreground">
+              {ordersOpen
+                ? "Orders are OPEN. Users can place orders."
+                : "Orders are CLOSED. Users cannot place orders."}
+            </p>
+          </div>
+          <button
+            onClick={toggleOrdersOpen}
+            className={`relative h-10 w-16 rounded-full transition-colors ${
+              ordersOpen ? "bg-green-500" : "bg-red-500"
+            }`}
+          >
+            <span
+              className={`absolute top-1.5 h-7 w-7 rounded-full bg-white shadow transition-transform ${
+                ordersOpen ? "left-1.5" : "left-8"
+              }`}
+            />
+          </button>
+        </div>
+      </div>
+
+      {/* Maintenance Mode */}
+      <div className="rounded-xl border bg-card p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="flex items-center gap-2 text-xl font-semibold">
+              {!isMaintenance ? (
+                <Power className="h-6 w-6 text-green-500" />
+              ) : (
+                <PowerOff className="h-6 w-6 text-red-500" />
+              )}
+              Maintenance Mode
+            </h3>
+            <p className="mt-2 text-base text-muted-foreground">
+              {!isMaintenance
+                ? "App is LIVE. Users can access the site."
+                : "App is DOWN. Users see a maintenance screen."}
+            </p>
+          </div>
+          <button
+            onClick={toggleMaintenance}
+            className={`relative h-10 w-16 rounded-full transition-colors ${
+              !isMaintenance ? "bg-green-500" : "bg-red-500"
+            }`}
+          >
+            <span
+              className={`absolute top-1.5 h-7 w-7 rounded-full bg-white shadow transition-transform ${
+                !isMaintenance ? "left-1.5" : "left-8"
+              }`}
+            />
+          </button>
+        </div>
+      </div>
+
+      {/* Login Popup Message */}
+      <div className="rounded-xl border bg-card p-6">
+        <h3 className="mb-4 flex items-center gap-2 text-xl font-semibold">
+          <Megaphone className="h-6 w-6 text-primary" />
+          Login Popup
+        </h3>
+        <p className="mb-4 text-base text-muted-foreground">
+          This message appears as a popup when customers log in.
+        </p>
+        <div className="space-y-4">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">No of Sheeps</label>
+            <input
+              value={popupSheep}
+              onChange={(e) => setPopupSheep(e.target.value)}
+              placeholder="e.g. 50 sheeps available"
+              type="text"
+              className="w-full rounded-xl border bg-background px-4 py-3 text-base"
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">Active Users</label>
+            <input
+              value={popupUsers}
+              onChange={(e) => setPopupUsers(e.target.value)}
+              placeholder="e.g. 12 active users"
+              type="text"
+              className="w-full rounded-xl border bg-background px-4 py-3 text-base"
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">Popup Message</label>
+            <input
+              value={popupMsg}
+              onChange={(e) => setPopupMsg(e.target.value)}
+              placeholder="Grab it faster!"
+              type="text"
+              className="w-full rounded-xl border bg-background px-4 py-3 text-base"
+            />
+          </div>
+          <button
+            onClick={savePopup}
+            className="rounded-xl bg-primary px-6 py-3 text-base font-medium text-primary-foreground hover:opacity-90"
+          >
+            {popupSaved ? "Saved!" : "Save Popup"}
+          </button>
+        </div>
+      </div>
+
       {/* Maintenance Mode */}
       <div className="rounded-xl border bg-card p-6">
         <div className="flex items-center justify-between">

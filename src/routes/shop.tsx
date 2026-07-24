@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Plus, Search, ShoppingCart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getPhone, getRole } from "@/lib/session";
@@ -14,6 +14,7 @@ type Product = {
   price: number;
   active: boolean;
   image_url?: string | null;
+  stock?: number | null;
 };
 
 export const Route = createFileRoute("/shop")({
@@ -39,12 +40,28 @@ function ShopPage() {
     }
   }, [navigate]);
 
+  const { data: settings = {} } = useQuery<Record<string, string>>({
+    queryKey: ["settings"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("settings").select("*");
+      if (error) return {};
+      const map: Record<string, string> = {};
+      (data || []).forEach((s) => {
+        map[s.key] = s.value;
+      });
+      return map;
+    },
+    staleTime: 30_000,
+  });
+
+  const ordersOpen = settings.orders_open !== "false";
+
   const { data: products = [], isLoading } = useQuery<Product[]>({
     queryKey: ["products", "active"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("*")
+        .select("id, name, unit, price, image_url, active, created_at, stock")
         .eq("active", true)
         .order("name");
       if (error) {
@@ -53,22 +70,68 @@ function ShopPage() {
       }
       return (data as Product[]) || [];
     },
-    staleTime: 300_000,
   });
+
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("products-stock")
+      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["products", "active"] });
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const cartCount = getCart().reduce((s, i) => s + i.quantity, 0);
   const filtered = products.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()));
 
   const add = (p: Product) => {
+    const cart = getCart();
+    const inCart = cart.find((c) => c.product_id === p.id);
+    const inCartQty = inCart ? inCart.quantity : 0;
+    if (p.stock != null && inCartQty >= p.stock) {
+      return;
+    }
     addToCart({ product_id: p.id, name: p.name, unit: p.unit, price: Number(p.price) }, 1);
     setAdded(p.id);
     setTimeout(() => setAdded(null), 1000);
+  };
+
+  const isOutOfStock = (p: Product) => {
+    if (!ordersOpen) return true;
+    if (p.stock == null) return false;
+    const cart = getCart();
+    const inCart = cart.find((c) => c.product_id === p.id);
+    const inCartQty = inCart ? inCart.quantity : 0;
+    return inCartQty >= p.stock;
+  };
+
+  const stockLabel = (p: Product) => {
+    if (!ordersOpen) return "Orders closed";
+    if (p.stock == null) return "Unlimited";
+    const cart = getCart();
+    const inCart = cart.find((c) => c.product_id === p.id);
+    const inCartQty = inCart ? inCart.quantity : 0;
+    const available = p.stock - inCartQty;
+    if (available <= 0) return "Out of stock";
+    return `${available} ${p.unit} available`;
   };
 
   return (
     <div className="min-h-screen bg-background">
       <AppHeader title="Shop" />
       <main className="mx-auto max-w-6xl px-3 py-4 sm:px-4 sm:py-6">
+        {/* Orders Closed Banner */}
+        {!ordersOpen && (
+          <div className="mb-4 rounded-xl border-2 border-red-300 bg-red-50 p-4 text-center text-base font-semibold text-red-700">
+            Orders are currently closed. Please check back later.
+          </div>
+        )}
+
         {/* Hero Banner */}
         <div className="relative mb-6 overflow-hidden rounded-2xl sm:mb-8">
           <img
@@ -164,16 +227,26 @@ function ShopPage() {
                       per {p.unit}
                     </p>
                   </div>
+                  <div className="mt-3 flex items-center gap-2 text-xs sm:text-sm">
+                    <span
+                      className={`font-medium ${isOutOfStock(p) ? "text-red-500" : "text-green-600"}`}
+                    >
+                      {stockLabel(p)}
+                    </span>
+                  </div>
                   <div className="mt-4 flex items-center justify-between gap-3">
                     <span className="text-xl font-bold text-primary sm:text-2xl">
                       INR {Number(p.price).toFixed(0)}
                     </span>
                     <button
                       onClick={() => add(p)}
+                      disabled={!ordersOpen || isOutOfStock(p)}
                       className={`flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition sm:px-6 sm:py-3.5 sm:text-base ${
                         added === p.id
                           ? "bg-green-600 text-white"
-                          : "bg-primary text-primary-foreground hover:opacity-90 active:scale-[0.98]"
+                          : !ordersOpen || isOutOfStock(p)
+                            ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                            : "bg-primary text-primary-foreground hover:opacity-90 active:scale-[0.98]"
                       }`}
                     >
                       {added === p.id ? (
@@ -182,7 +255,12 @@ function ShopPage() {
                         </>
                       ) : (
                         <>
-                          <Plus className="h-4 w-4 sm:h-5 sm:w-5" /> Add to Cart
+                          <Plus className="h-4 w-4 sm:h-5 sm:w-5" />{" "}
+                          {!ordersOpen
+                            ? "Orders Closed"
+                            : isOutOfStock(p)
+                              ? "Out of Stock"
+                              : "Add to Cart"}
                         </>
                       )}
                     </button>
