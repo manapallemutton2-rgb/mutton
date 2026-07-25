@@ -60,7 +60,7 @@ function AdminLoginPage() {
             Manapalle <span className="text-xs opacity-70">Mutton & Chicken</span>
           </p>
           <p className="mt-1 text-xs text-muted-foreground/70">
-            Fresh from the Village, Straight to Your Home
+            Fresh from the Village, Straight to Your Home — 9030901233
           </p>
         </div>
 

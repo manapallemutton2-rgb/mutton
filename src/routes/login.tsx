@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { User, Phone, ArrowRight, Megaphone } from "lucide-react";
 import { setSession, getRole } from "@/lib/session";
 import { supabase } from "@/integrations/supabase/client";
+import { AboutSection } from "@/components/AboutSection";
 
 export const Route = createFileRoute("/login")({
   beforeLoad: () => {
@@ -51,23 +52,14 @@ function LoginPage() {
 
   return (
     <div className="flex min-h-screen">
-      {/* Left: Hero Image */}
-      <div className="relative hidden w-1/2 lg:block">
-        <img
-          src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&h=1200&fit=crop"
-          alt="Fresh meat display"
-          className="h-full w-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-        <div className="absolute bottom-12 left-12 text-white">
-          <img src="/MM.jpeg" alt="Logo" className="mb-4 h-16 w-16 rounded-2xl object-contain" />
-          <h2 className="text-4xl font-bold leading-tight">
-            Manapalle
-            <span className="block text-xl font-medium opacity-80">Mutton & Chicken</span>
-          </h2>
-          <p className="mt-3 max-w-sm text-lg text-white/80">
-            Fresh from the Village, Straight to Your Home
-          </p>
+      {/* Left: About Us (desktop) */}
+      <div className="hidden w-1/2 overflow-y-auto p-10 lg:block">
+        <AboutSection />
+        <div className="mt-4 space-y-1 rounded-xl bg-muted/30 px-5 py-4 text-sm text-muted-foreground">
+          <p>G-3, Vaishnavi Towers, Sri Lakshmi Nagar Colony,</p>
+          <p>Near Marrichettu Junction, Manikonda,</p>
+          <p>Hyderabad - 500089.</p>
+          <p className="pt-1 font-semibold text-primary">Cell: 9030901233</p>
         </div>
       </div>
 
@@ -87,7 +79,7 @@ function LoginPage() {
               </span>
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Fresh from the Village, Straight to Your Home
+              Fresh from the Village, Straight to Your Home — 9030901233
             </p>
           </div>
 
@@ -181,6 +173,17 @@ function LoginPage() {
               Admin Login
             </a>
           </p>
+
+          {/* About Us (mobile) */}
+          <div className="mt-10 lg:hidden">
+            <AboutSection />
+            <div className="mt-4 space-y-1 rounded-xl bg-muted/30 px-5 py-4 text-sm text-muted-foreground">
+              <p>G-3, Vaishnavi Towers, Sri Lakshmi Nagar Colony,</p>
+              <p>Near Marrichettu Junction, Manikonda,</p>
+              <p>Hyderabad - 500089.</p>
+              <p className="pt-1 font-semibold text-primary">Cell: 9030901233</p>
+            </div>
+          </div>
         </div>
       </div>
     </div>

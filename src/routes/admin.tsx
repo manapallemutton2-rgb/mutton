@@ -951,7 +951,7 @@ function PrintSheet({
             Manapalle
             <span className="block text-base font-medium opacity-80">Mutton & Chicken</span>
           </h1>
-          <p className="text-xs text-gray-500">Fresh from the Village, Straight to Your Home</p>
+          <p className="text-xs text-gray-500">Fresh from the Village, Straight to Your Home — 9030901233</p>
           <p className="text-sm font-semibold">{title}</p>
           <p className="text-xs text-gray-600">Printed: {new Date().toLocaleString()}</p>
         </div>

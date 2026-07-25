@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getRole } from "@/lib/session";
 import { MaintenanceScreen } from "@/components/MaintenanceScreen";
 import { BtPrinterButton } from "@/components/BtPrinterButton";
+import { Footer } from "@/components/Footer";
 
 import appCss from "../styles.css?url";
 
@@ -133,12 +134,22 @@ function MaintenanceCheck() {
   }
 
   if (isAdminLogin) {
-    return <Outlet />;
+    return (
+      <>
+        <Outlet />
+        <Footer />
+      </>
+    );
   }
 
   if (!isLoading && settings.maintenance_mode === "true") {
     return <MaintenanceScreen message={settings.maintenance_message} />;
   }
 
-  return <Outlet />;
+  return (
+    <>
+      <Outlet />
+      <Footer />
+    </>
+  );
 }

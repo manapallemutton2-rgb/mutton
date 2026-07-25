@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getPhone, getRole } from "@/lib/session";
 import { addToCart, getCart } from "@/lib/cart";
 import { AppHeader } from "@/components/AppHeader";
+import { AboutSection } from "@/components/AboutSection";
 
 type Product = {
   id: string;
@@ -149,7 +150,7 @@ function ShopPage() {
             <div className="px-5 sm:px-12">
               <h1 className="text-2xl font-bold text-white sm:text-5xl">Fresh Meat</h1>
               <p className="mt-2 max-w-lg text-sm text-white/80 sm:text-lg">
-                Fresh from the Village, Straight to Your Home
+                Fresh from the Village, Straight to Your Home — 9030901233
               </p>
             </div>
           </div>
@@ -275,6 +276,10 @@ function ShopPage() {
             ))}
           </div>
         )}
+
+        <div className="mt-10">
+          <AboutSection />
+        </div>
       </main>
     </div>
   );

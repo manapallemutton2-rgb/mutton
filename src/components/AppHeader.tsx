@@ -124,7 +124,7 @@ export function AppHeader({ title }: { title?: string }) {
               <span className="text-base font-normal opacity-70"> Mutton & Chicken</span>
             </span>
             <div className="text-[11px] leading-tight text-muted-foreground">
-              Fresh from the Village, Straight to Your Home
+              Fresh from the Village, Straight to Your Home — 9030901233
             </div>
           </div>
           {title && (
@@ -176,6 +176,9 @@ export function AppHeader({ title }: { title?: string }) {
 
         {/* Desktop nav */}
         <nav className="hidden items-center gap-4 text-base md:flex">
+          <Link to="/about" className="font-medium hover:underline">
+            About Us
+          </Link>
           {phone && role === "user" && (
             <>
               <button
@@ -209,9 +212,11 @@ export function AppHeader({ title }: { title?: string }) {
             </>
           )}
           {phone && role === "admin" && (
-            <Link to="/admin" className="font-medium hover:underline">
-              Admin
-            </Link>
+            <>
+              <Link to="/admin" className="font-medium hover:underline">
+                Admin
+              </Link>
+            </>
           )}
           {phone && (
             <button
@@ -228,6 +233,9 @@ export function AppHeader({ title }: { title?: string }) {
       {menuOpen && phone && (
         <div className="border-t bg-card px-6 py-4 md:hidden">
           <div className="flex flex-col gap-3 text-base">
+            <Link to="/about" onClick={() => setMenuOpen(false)} className="py-2 font-medium">
+              About Us
+            </Link>
             {role === "user" && (
               <>
                 <span className="flex items-center gap-2 text-muted-foreground">
@@ -245,9 +253,11 @@ export function AppHeader({ title }: { title?: string }) {
               </>
             )}
             {role === "admin" && (
-              <Link to="/admin" onClick={() => setMenuOpen(false)} className="py-2 font-medium">
-                Admin Panel
-              </Link>
+              <>
+                <Link to="/admin" onClick={() => setMenuOpen(false)} className="py-2 font-medium">
+                  Admin Panel
+                </Link>
+              </>
             )}
             <button
               onClick={logout}

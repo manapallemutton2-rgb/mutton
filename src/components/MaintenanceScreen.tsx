@@ -14,7 +14,7 @@ export function MaintenanceScreen({ message }: { message?: string }) {
           <span className="block text-xl font-medium opacity-80">Mutton & Chicken</span>
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Fresh from the Village, Straight to Your Home
+          Fresh from the Village, Straight to Your Home — 9030901233
         </p>
         <div className="mt-8 rounded-2xl border bg-card p-10 shadow-sm">
           <Wrench className="mx-auto mb-6 h-16 w-16 text-orange-500" />
