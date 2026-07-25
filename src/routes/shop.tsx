@@ -52,7 +52,7 @@ function ShopPage() {
       });
       return map;
     },
-    staleTime: 30_000,
+    staleTime: 300_000,
   });
 
   const ordersOpen = settings.orders_open !== "false";
@@ -76,6 +76,7 @@ function ShopPage() {
         return a.name.localeCompare(b.name);
       });
     },
+    staleTime: 60_000,
   });
 
   const queryClient = useQueryClient();

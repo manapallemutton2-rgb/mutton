@@ -32,7 +32,7 @@ function LoginPage() {
       });
       return map;
     },
-    staleTime: 30_000,
+    staleTime: 300_000,
   });
 
   const handleLogin = (e: React.FormEvent) => {
@@ -56,9 +56,8 @@ function LoginPage() {
       <div className="hidden w-1/2 overflow-y-auto p-10 lg:block">
         <AboutSection />
         <div className="mt-4 space-y-1 rounded-xl bg-muted/30 px-5 py-4 text-sm text-muted-foreground">
-          <p>G-3, Vaishnavi Towers, Sri Lakshmi Nagar Colony,</p>
-          <p>Near Marrichettu Junction, Manikonda,</p>
-          <p>Hyderabad - 500089.</p>
+          <p>Village Gungal, Yacharam Mandal,</p>
+          <p>K.V.Rangareddy District - 501506</p>
           <p className="pt-1 font-semibold text-primary">Cell: 9030901233</p>
         </div>
       </div>

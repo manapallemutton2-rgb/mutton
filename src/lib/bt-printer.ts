@@ -240,6 +240,7 @@ export async function printReceipt(receipt: ReceiptData): Promise<boolean> {
   lines.push(centerText("MANAPALLE MUTTON", W));
   nl();
   lines.push(centerText(receipt.date || new Date().toLocaleString(), W));
+  lines.push(centerText("Call: 9030 90 1233", W));
   nl();
   hr();
 

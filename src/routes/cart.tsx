@@ -27,7 +27,7 @@ function CartPage() {
       });
       return map;
     },
-    staleTime: 30_000,
+    staleTime: 300_000,
   });
 
   const ordersOpen = settings.orders_open !== "false";

@@ -1060,6 +1060,9 @@ function ThermalSheet({
               <div style={{ textAlign: "center", fontSize: 10, marginBottom: "2mm" }}>
                 {new Date().toLocaleString()}
               </div>
+              <div style={{ textAlign: "center", fontSize: 10, marginBottom: "2mm" }}>
+                Call: 9030 90 1233
+              </div>
               <div className="divider-solid" />
               <div style={{ textAlign: "center", fontWeight: 800, fontSize: 13 }}>{title}</div>
               {blockName && (
@@ -1342,11 +1345,12 @@ function ProductsTab() {
           onChange={(e) => setUnit(e.target.value)}
           className="rounded-xl border bg-background px-4 py-4 text-base"
         >
-          <option value="kg">kg</option>
-          <option value="500g">500g</option>
-          <option value="dozen">dozen</option>
-          <option value="piece">piece</option>
-        </select>
+              <option value="kg">kg</option>
+              <option value="500g">500g</option>
+              <option value="750g">750g</option>
+              <option value="dozen">dozen</option>
+              <option value="piece">piece</option>
+            </select>
         <input
           value={price}
           onChange={(e) => setPrice(e.target.value)}

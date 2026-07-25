@@ -76,7 +76,7 @@ function CheckoutPage() {
       });
       return map;
     },
-    staleTime: 30_000,
+    staleTime: 300_000,
   });
 
   const ordersOpen = settings?.orders_open !== "false";
@@ -91,7 +91,7 @@ function CheckoutPage() {
       }
       return (data as Community[]) || [];
     },
-    staleTime: 60_000,
+    staleTime: 300_000,
   });
 
   const { data: blocks = [] } = useQuery<Block[]>({
@@ -104,9 +104,9 @@ function CheckoutPage() {
       }
       return (data as Block[]) || [];
     },
-    staleTime: 60_000,
+    staleTime: 300_000,
   });
-
+ 
   const placeOrderMutation = useMutation({
     mutationFn: async () => {
       const phone = getPhone();
@@ -245,6 +245,9 @@ function CheckoutPage() {
             <p className="mt-2 text-base text-muted-foreground sm:mt-3 sm:text-lg">
               We'll deliver to your community & block soon.
             </p>
+            <p className="mt-4 text-sm text-muted-foreground sm:text-base">
+              Need help? Call us at <span className="font-semibold text-primary">9030 90 1233</span>
+            </p>
           </div>
           <div className="mt-8 flex flex-col gap-3 sm:mt-10 sm:gap-4">
             {doneOrder && (
@@ -282,6 +285,9 @@ function CheckoutPage() {
                 </h1>
                 <div style={{ textAlign: "center", fontSize: 10, marginBottom: "2mm" }}>
                   {new Date(doneOrder.created_at).toLocaleString()}
+                </div>
+                <div style={{ textAlign: "center", fontSize: 10, marginBottom: "2mm" }}>
+                  Call: 9030 90 1233
                 </div>
                 <div className="divider-solid" />
                 <div

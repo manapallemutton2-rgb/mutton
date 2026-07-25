@@ -108,7 +108,7 @@ function MaintenanceCheck() {
   const isAdminLogin = typeof window !== "undefined" && window.location.pathname === "/admin-login";
 
   const { data: settings = {}, isLoading } = useQuery<Record<string, string>>({
-    queryKey: ["maintenance"],
+    queryKey: ["settings"],
     queryFn: async () => {
       const { data, error } = await supabase.from("settings").select("*");
       if (error) {
@@ -121,7 +121,7 @@ function MaintenanceCheck() {
       });
       return map;
     },
-    staleTime: 60_000,
+    staleTime: 300_000,
   });
 
   if (role === "admin") {
