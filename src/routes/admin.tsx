@@ -943,17 +943,17 @@ function PrintSheet({
   const grandTotal = Math.round(orders.reduce((s, o) => s + Number(o.total), 0));
 
   return (
-    <div className="print-page a4-only rounded-lg border bg-white p-6 text-black">
-      <div className="mb-4 flex items-center gap-3 border-b-2 border-black pb-3">
+    <div className="print-page a4-only bg-white p-6 text-black" style={{ border: "none", borderRadius: 0 }}>
+      <div className="mb-4 flex items-center gap-4 border-b-2 border-black pb-3">
         <img src="/MM.jpeg" alt="Logo" className="h-14 w-14 object-contain" />
         <div>
           <h1 className="text-2xl font-bold leading-tight">
             Manapalle
-            <span className="block text-base font-medium opacity-80">Mutton & Chicken</span>
+            <span className="block text-sm font-medium">Mutton & Chicken</span>
           </h1>
-          <p className="text-xs text-gray-500">Fresh from the Village, Straight to Your Home — 9030901233</p>
-          <p className="text-sm font-semibold">{title}</p>
-          <p className="text-xs text-gray-600">Printed: {new Date().toLocaleString()}</p>
+          <p className="mt-1 text-xs text-gray-500">Fresh from the Village, Straight to Your Home — 9030901233</p>
+          <p className="mt-1 text-sm font-bold">{title}</p>
+          <p className="text-[10px] text-gray-600">Printed: {new Date().toLocaleString()}</p>
         </div>
       </div>
 
@@ -963,14 +963,14 @@ function PrintSheet({
         const blockOrders = orders.filter((o) => o.block_name === blockName);
         const blockTotal = Math.round(blockOrders.reduce((s, o) => s + Number(o.total), 0));
         return (
-          <div key={blockName} className="mb-6">
+          <div key={blockName} className="mb-6 avoid-break">
             <h2 className="mb-2 border-b-2 border-black bg-gray-100 px-3 py-1 text-base font-bold">
               Block: {blockName} ({blockOrders.length} orders)
             </h2>
-            {blockOrders.map((o) => {
+              {blockOrders.map((o) => {
               const oItems = items.filter((i) => i.order_id === o.id);
               return (
-                <div key={o.id} className="mb-3 border border-gray-400 p-3 text-sm">
+                <div key={o.id} className="mb-3 avoid-break border border-gray-400 p-3 text-sm" style={{ borderRadius: 0 }}>
                   <div className="flex justify-between border-b border-gray-300 pb-1 font-semibold">
                     <span>
                       {o.order_number} &mdash; <b>{o.customer_name}</b>, Flat {o.flat_no || "-"}
@@ -980,7 +980,7 @@ function PrintSheet({
                     </span>
                   </div>
                   {o.packing_note && (
-                    <div className="mt-1 rounded bg-yellow-50 px-2 py-1 text-xs font-semibold text-yellow-800 border border-yellow-300">
+                    <div className="mt-1 px-2 py-1 text-xs font-semibold text-yellow-800 border border-yellow-300" style={{ borderRadius: 0 }}>
                       Note: {o.packing_note}
                     </div>
                   )}

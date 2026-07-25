@@ -237,28 +237,35 @@
 }
 @page {
   size: A4;
-  margin: 8mm;
+  margin: 10mm;
 }
 
 .print-page {
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.5;
+  color: #000;
 }
 .print-page table {
   width: 100%;
   border-collapse: collapse;
 }
+.print-page table th {
+  padding: 4px 6px;
+  text-align: left;
+  font-size: 11px;
+}
 .print-page table td {
   padding: 3px 6px;
+  font-size: 12px;
 }
 .print-page h1 {
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 800;
 }
 .print-page h2 {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
 }
-.print-page b {
-  font-weight: 700;
+.print-page .avoid-break {
+  page-break-inside: avoid;
 }

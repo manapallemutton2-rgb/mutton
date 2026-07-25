@@ -9,6 +9,17 @@ import { getPhone } from "@/lib/session";
 
 const BASE_KEY = "mm_cart";
 
+const UNIT_TO_KG: Record<string, number> = {
+  "500g": 0.5,
+  "750g": 0.75,
+  "1kg": 1,
+};
+
+export function unitToKg(unit: string, quantity: number): number {
+  const kg = UNIT_TO_KG[unit];
+  return kg != null ? kg * quantity : quantity;
+}
+
 export function getCart(): CartItem[] {
   if (typeof window === "undefined") return [];
   // Clean up legacy shared cart key if present
@@ -34,11 +45,15 @@ export function saveCart(items: CartItem[]) {
   window.dispatchEvent(new Event("cart-updated"));
 }
 
+function cartKey(item: { product_id: string; unit: string }) {
+  return item.product_id + "|" + item.unit;
+}
+
 export function addToCart(item: Omit<CartItem, "quantity">, qty = 1) {
   const phone = getPhone();
   if (!phone) return;
   const cart = getCart();
-  const existing = cart.find((c) => c.product_id === item.product_id);
+  const existing = cart.find((c) => c.product_id === item.product_id && c.unit === item.unit);
   if (existing) {
     existing.quantity += qty;
   } else {
@@ -47,19 +62,19 @@ export function addToCart(item: Omit<CartItem, "quantity">, qty = 1) {
   saveCart(cart);
 }
 
-export function updateQty(product_id: string, quantity: number) {
+export function updateQty(product_id: string, unit: string, quantity: number) {
   const phone = getPhone();
   if (!phone) return;
   const cart = getCart()
-    .map((c) => (c.product_id === product_id ? { ...c, quantity } : c))
+    .map((c) => (cartKey(c) === cartKey({ product_id, unit }) ? { ...c, quantity } : c))
     .filter((c) => c.quantity > 0);
   saveCart(cart);
 }
 
-export function removeFromCart(product_id: string) {
+export function removeFromCart(product_id: string, unit: string) {
   const phone = getPhone();
   if (!phone) return;
-  saveCart(getCart().filter((c) => c.product_id !== product_id));
+  saveCart(getCart().filter((c) => cartKey(c) !== cartKey({ product_id, unit })));
 }
 
 export function clearCart() {
