@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Plus, Search, ShoppingCart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,48 +18,11 @@ type Product = {
   stock?: number | null;
 };
 
-type ProductGroup = {
-  baseName: string;
-  variants: Product[];
-};
-
-const SIZE_PATTERN = /^(.+?)\s+(\d+(?:\.\d+)?(?:kg|g))$/i;
-
-function parseProduct(name: string): { baseName: string; size: string | null } {
-  const m = name.match(SIZE_PATTERN);
-  if (m) return { baseName: m[1].trim(), size: m[2].toLowerCase() };
-  return { baseName: name, size: null };
-}
-
-function groupProducts(products: Product[]): ProductGroup[] {
-  const groups = new Map<string, Product[]>();
-  for (const p of products) {
-    const { baseName } = parseProduct(p.name);
-    if (!groups.has(baseName)) groups.set(baseName, []);
-    groups.get(baseName)!.push(p);
-  }
-  return Array.from(groups.entries())
-    .map(([baseName, variants]) => ({
-      baseName,
-      variants: variants.sort((a, b) => {
-        const aSize = parseProduct(a.name).size;
-        const bSize = parseProduct(b.name).size;
-        if (aSize && bSize) {
-          const aNum = parseFloat(aSize);
-          const bNum = parseFloat(bSize);
-          if (aNum !== bNum) return aNum - bNum;
-        }
-        return a.name.localeCompare(b.name);
-      }),
-    }))
-    .sort((a, b) => {
-      const aIsMutton = a.baseName.toLowerCase().startsWith("mutton");
-      const bIsMutton = b.baseName.toLowerCase().startsWith("mutton");
-      if (aIsMutton && !bIsMutton) return -1;
-      if (!aIsMutton && bIsMutton) return 1;
-      return a.baseName.localeCompare(b.baseName);
-    });
-}
+const SIZE_OPTIONS = [
+  { label: "500g", multiplier: 0.5 },
+  { label: "750g", multiplier: 0.75 },
+  { label: "1kg", multiplier: 1 },
+];
 
 export const Route = createFileRoute("/shop")({
   component: ShopPage,
@@ -69,6 +32,7 @@ export const Route = createFileRoute("/shop")({
 function ShopPage() {
   const navigate = useNavigate();
   const [added, setAdded] = useState<string | null>(null);
+  const [selectedSize, setSelectedSize] = useState<Record<string, string>>({});
   const [search, setSearch] = useState("");
 
   useEffect(() => {
@@ -137,58 +101,33 @@ function ShopPage() {
   }, [queryClient]);
 
   const cartCount = getCart().reduce((s, i) => s + i.quantity, 0);
+  const filtered = products.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()));
 
-  const groups = useMemo(() => groupProducts(products), [products]);
-  const filtered = useMemo(
-    () =>
-      groups.filter((g) => g.baseName.toLowerCase().includes(search.toLowerCase())),
-    [groups, search],
-  );
-
-  const add = (p: Product) => {
+  const add = (p: Product, sizeLabel: string, sizePrice: number) => {
     const cart = getCart();
-    const inCart = cart.find((c) => c.product_id === p.id);
+    const inCart = cart.find((c) => c.product_id === p.id && c.unit === sizeLabel);
     const inCartQty = inCart ? inCart.quantity : 0;
     if (p.stock != null && inCartQty >= p.stock) {
       return;
     }
-    addToCart({ product_id: p.id, name: p.name, unit: p.unit, price: Number(p.price) }, 1);
-    setAdded(p.id);
+    addToCart({ product_id: p.id, name: `${p.name} (${sizeLabel})`, unit: sizeLabel, price: sizePrice }, 1);
+    const key = p.id + "|" + sizeLabel;
+    setAdded(key);
     setTimeout(() => setAdded(null), 1000);
   };
 
-  const isOutOfStock = (p: Product) => {
-    if (!ordersOpen) return true;
-    if (p.stock == null) return false;
-    const cart = getCart();
-    const inCart = cart.find((c) => c.product_id === p.id);
-    const inCartQty = inCart ? inCart.quantity : 0;
-    return inCartQty >= p.stock;
-  };
-
-  const stockLabel = (p: Product) => {
-    if (!ordersOpen) return "Orders closed";
-    if (p.stock == null) return "Unlimited";
-    const cart = getCart();
-    const inCart = cart.find((c) => c.product_id === p.id);
-    const inCartQty = inCart ? inCart.quantity : 0;
-    const available = p.stock - inCartQty;
-    if (available <= 0) return "Out of stock";
-    return `${available} ${p.unit} available`;
-  };
+  const hasSizes = (p: Product) => p.unit === "kg";
 
   return (
     <div className="min-h-screen bg-background">
       <AppHeader title="Shop" />
       <main className="mx-auto max-w-6xl px-3 py-4 sm:px-4 sm:py-6">
-        {/* Orders Closed Banner */}
         {!ordersOpen && (
           <div className="mb-4 rounded-xl border-2 border-red-300 bg-red-50 p-4 text-center text-base font-semibold text-red-700">
             Orders are currently closed. Please check back later.
           </div>
         )}
 
-        {/* Hero Banner */}
         <div className="relative mb-6 overflow-hidden rounded-2xl sm:mb-8">
           <img
             src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200&h=400&fit=crop"
@@ -206,7 +145,6 @@ function ShopPage() {
           </div>
         </div>
 
-        {/* Search Bar */}
         <div className="mb-5 flex items-center gap-3 sm:mb-6">
           <div className="flex flex-1 items-center gap-3 rounded-xl border bg-card px-4 py-3 transition focus-within:ring-2 focus-within:ring-primary sm:px-5 sm:py-3.5">
             <Search className="h-5 w-5 shrink-0 text-muted-foreground" />
@@ -232,7 +170,6 @@ function ShopPage() {
           </button>
         </div>
 
-        {/* Products Grid */}
         {isLoading ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
             {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -257,18 +194,18 @@ function ShopPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
-            {filtered.map((group, idx) => {
-              const imageUrl = group.variants.find((v) => v.image_url)?.image_url;
+            {filtered.map((p, idx) => {
+              const sizes = hasSizes(p) ? SIZE_OPTIONS : null;
               return (
                 <div
-                  key={group.baseName}
+                  key={p.id}
                   className={`animate-slide-up stagger-${Math.min(idx + 1, 6)} group flex flex-col overflow-hidden rounded-2xl border bg-card shadow-sm transition hover:shadow-lg`}
                 >
                   <div className="relative h-40 shrink-0 overflow-hidden sm:h-52">
-                    {imageUrl ? (
+                    {p.image_url ? (
                       <img
-                        src={imageUrl}
-                        alt={group.baseName}
+                        src={p.image_url}
+                        alt={p.name}
                         className="h-full w-full object-cover transition duration-500 group-hover:scale-110"
                         loading="lazy"
                       />
@@ -280,55 +217,91 @@ function ShopPage() {
                   </div>
                   <div className="flex flex-1 flex-col justify-between p-4 sm:p-6">
                     <div>
-                      <h3 className="text-lg font-semibold sm:text-xl">{group.baseName}</h3>
+                      <h3 className="text-lg font-semibold sm:text-xl">{p.name}</h3>
                     </div>
-                    <div className="mt-4 space-y-2">
-                      {group.variants.map((v) => {
-                        const outOfStock = !ordersOpen || (v.stock != null && (getCart().find((c) => c.product_id === v.id)?.quantity ?? 0) >= v.stock);
-                        const isAdded = added === v.id;
-                        return (
-                          <div
-                            key={v.id}
-                            className="flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5 sm:px-4 sm:py-3"
-                          >
-                            <div className="min-w-0 flex-1">
-                              <span className="text-sm font-medium sm:text-base">
-                                {parseProduct(v.name).size || v.unit}
-                              </span>
-                              <span className="ml-2 text-sm text-muted-foreground">
-                                INR {Number(v.price).toFixed(0)}
-                              </span>
-                              {v.stock != null && (
-                                <span className={`ml-2 text-xs ${outOfStock ? "text-red-500" : "text-green-600"}`}>
-                                  {outOfStock ? "Out" : `${v.stock - (getCart().find((c) => c.product_id === v.id)?.quantity ?? 0)} left`}
-                                </span>
-                              )}
-                            </div>
-                            <button
-                              onClick={() => add(v)}
-                              disabled={!ordersOpen || outOfStock}
-                              className={`flex shrink-0 items-center justify-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition sm:px-4 sm:py-2 sm:text-sm ${
-                                isAdded
-                                  ? "bg-green-600 text-white"
-                                  : !ordersOpen || outOfStock
-                                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                                    : "bg-primary text-primary-foreground hover:opacity-90 active:scale-[0.98]"
+
+                    {sizes ? (
+                      <div className="mt-4 space-y-2">
+                        {sizes.map((size) => {
+                          const calcPrice = Math.round(p.price * size.multiplier);
+                          const key = p.id + "|" + size.label;
+                          const isAdded = added === key;
+                          const cartItem = getCart().find((c) => c.product_id === p.id && c.unit === size.label);
+                          const outOfStock = !ordersOpen || (p.stock != null && (cartItem?.quantity ?? 0) >= p.stock);
+                          return (
+                            <div
+                              key={size.label}
+                              className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5 sm:px-4 sm:py-3 ${
+                                selectedSize[p.id] === size.label ? "border-primary bg-primary/5" : ""
                               }`}
                             >
-                              {isAdded ? (
-                                <Check className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                              ) : !ordersOpen ? (
-                                "Closed"
-                              ) : outOfStock ? (
-                                "Out"
-                              ) : (
-                                <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                              )}
-                            </button>
+                              <div className="min-w-0 flex-1">
+                                <span className="text-sm font-medium sm:text-base">{size.label}</span>
+                                <span className="ml-2 text-sm text-muted-foreground">
+                                  INR {calcPrice}
+                                </span>
+                                {p.stock != null && (
+                                  <span className={`ml-2 text-xs ${outOfStock ? "text-red-500" : "text-green-600"}`}>
+                                    {outOfStock ? "Out" : `${p.stock - (cartItem?.quantity ?? 0)} left`}
+                                  </span>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => add(p, size.label, calcPrice)}
+                                disabled={!ordersOpen || outOfStock}
+                                className={`flex shrink-0 items-center justify-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition sm:px-4 sm:py-2 sm:text-sm ${
+                                  isAdded
+                                    ? "bg-green-600 text-white"
+                                    : !ordersOpen || outOfStock
+                                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                      : "bg-primary text-primary-foreground hover:opacity-90 active:scale-[0.98]"
+                                }`}
+                              >
+                                {isAdded ? (
+                                  <Check className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                ) : !ordersOpen ? (
+                                  "Closed"
+                                ) : outOfStock ? (
+                                  "Out"
+                                ) : (
+                                  <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                )}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="mt-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm text-muted-foreground">per {p.unit}</p>
+                            <span className="text-xl font-bold text-primary sm:text-2xl">
+                              INR {Number(p.price).toFixed(0)}
+                            </span>
                           </div>
-                        );
-                      })}
-                    </div>
+                          <button
+                            onClick={() => add(p, p.unit, Number(p.price))}
+                            disabled={!ordersOpen}
+                            className={`flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition sm:px-6 sm:py-3.5 sm:text-base ${
+                              added === p.id + "|" + p.unit
+                                ? "bg-green-600 text-white"
+                                : !ordersOpen
+                                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                  : "bg-primary text-primary-foreground hover:opacity-90 active:scale-[0.98]"
+                            }`}
+                          >
+                            {added === p.id + "|" + p.unit ? (
+                              <><Check className="h-4 w-4 sm:h-5 sm:w-5" /> Added</>
+                            ) : !ordersOpen ? (
+                              "Orders Closed"
+                            ) : (
+                              <><Plus className="h-4 w-4 sm:h-5 sm:w-5" /> Add to Cart</>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               );

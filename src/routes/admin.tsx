@@ -1387,7 +1387,6 @@ function ProductsTab() {
             <tr>
               <th className="p-3">Image</th>
               <th className="p-3">Name</th>
-              <th className="p-3">Group</th>
               <th className="p-3">Unit</th>
               <th className="p-3">Price</th>
               <th className="p-3">Stock</th>
@@ -1418,12 +1417,6 @@ function ProductsTab() {
                     onBlur={(e) => updateName(p, e.target.value)}
                     className="w-full min-w-[120px] rounded-xl border bg-background px-3 py-2 text-base"
                   />
-                </td>
-                <td className="p-3 text-sm text-muted-foreground">
-                  {(() => {
-                    const m = p.name.match(/^(.+?)\s+(\d+(?:\.\d+)?(?:kg|g))$/i);
-                    return m ? m[1].trim() : "—";
-                  })()}
                 </td>
                 <td className="p-3">
                   <select
