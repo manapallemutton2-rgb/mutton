@@ -963,68 +963,66 @@ function PrintSheet({
         const blockOrders = orders.filter((o) => o.block_name === blockName);
         const blockTotal = Math.round(blockOrders.reduce((s, o) => s + Number(o.total), 0));
         return (
-          <div key={blockName} className="mb-6 avoid-break">
-            <h2 className="mb-2 border-b-2 border-black bg-gray-100 px-3 py-1 text-base font-bold">
-              Block: {blockName} ({blockOrders.length} orders)
+          <div key={blockName} className="mb-5 avoid-break">
+            <h2 className="mb-1.5 border-b-2 border-black px-2 py-0.5 text-sm font-bold bg-gray-100">
+              Block {blockName} &mdash; {blockOrders.length} order{blockOrders.length !== 1 ? "s" : ""}
             </h2>
               {blockOrders.map((o) => {
               const oItems = items.filter((i) => i.order_id === o.id);
+              const showAlt = o.alt_phone && o.alt_phone !== o.phone;
               return (
-                <div key={o.id} className="mb-3 avoid-break border border-gray-400 p-3 text-sm" style={{ borderRadius: 0 }}>
-                  <div className="flex justify-between border-b border-gray-300 pb-1 font-semibold">
-                    <span>
-                      {o.order_number} &mdash; <b>{o.customer_name}</b>, Flat {o.flat_no || "-"}
+                <div key={o.id} className="mb-3 avoid-break border border-gray-400 p-2 text-xs" style={{ borderRadius: 0 }}>
+                  <div className="flex items-baseline justify-between gap-2 border-b border-gray-300 pb-1 font-semibold">
+                    <span className="truncate">
+                      {o.order_number} &mdash; {o.customer_name}, {o.flat_no || "-"}
                     </span>
-                    <span className="text-gray-600">
-                      {o.phone} {o.alt_phone ? `/ ${o.alt_phone}` : ""}
+                    <span className="whitespace-nowrap text-[10px] text-gray-600">
+                      {o.phone}{showAlt ? ` / ${o.alt_phone}` : ""}
                     </span>
                   </div>
                   {o.packing_note && (
-                    <div className="mt-1 px-2 py-1 text-xs font-semibold text-yellow-800 border border-yellow-300" style={{ borderRadius: 0 }}>
+                    <div className="mt-1 px-1.5 py-0.5 text-[10px] font-semibold border border-gray-400 inline-block">
                       Note: {o.packing_note}
                     </div>
                   )}
-                  <table className="mt-2 w-full border-collapse">
+                  <table className="mt-1.5 w-full border-collapse">
                     <thead>
-                      <tr className="border-b border-gray-300 text-xs text-gray-600">
-                        <th className="py-1 text-left">Item</th>
-                        <th className="py-1 text-center">Qty</th>
-                        <th className="py-1 text-right">Amount</th>
+                      <tr className="border-b border-gray-400 text-[10px] text-gray-600">
+                        <th className="py-0.5 text-left w-[60%]">Item</th>
+                        <th className="py-0.5 text-center w-[20%]">Qty</th>
+                        <th className="py-0.5 text-right w-[20%]">Amount</th>
                       </tr>
                     </thead>
                     <tbody>
                       {oItems.map((it) => {
                         const lineAmt = Math.round(Number(it.price) * Number(it.quantity));
+                        const qtyDisplay = it.quantity === 1 ? it.unit : it.quantity + it.unit;
                         return (
-                          <tr key={it.id} className="border-b border-gray-100">
-                            <td className="py-1">{it.product_name}</td>
-                            <td className="py-1 text-center">
-                              {it.quantity} {it.unit}
-                            </td>
-                            <td className="py-1 text-right">
-                              INR {lineAmt}
-                            </td>
+                          <tr key={it.id} className="border-b border-gray-200">
+                            <td className="py-0.5">{it.product_name}</td>
+                            <td className="py-0.5 text-center">{qtyDisplay}</td>
+                            <td className="py-0.5 text-right">INR {lineAmt}</td>
                           </tr>
                         );
                       })}
                     </tbody>
                   </table>
-                  <div className="mt-1 flex justify-between border-t-2 border-black pt-1 font-bold">
-                    <span>Order Total</span>
+                  <div className="mt-0.5 flex justify-between border-t-2 border-black pt-0.5 font-bold text-xs">
+                    <span>Total</span>
                     <span>INR {Math.round(Number(o.total))}</span>
                   </div>
                 </div>
               );
             })}
-            <div className="flex justify-between border-t-2 border-black bg-gray-100 px-3 py-1 text-sm font-bold">
+            <div className="flex justify-between border-t-2 border-black px-2 py-0.5 text-xs font-bold">
               <span>Block {blockName} Subtotal</span>
               <span>INR {blockTotal}</span>
             </div>
           </div>
         );
       })}
-      <div className="flex justify-between border-t-4 border-double border-black px-3 py-2 text-lg font-bold">
-        <span>GRAND TOTAL ({orders.length} orders)</span>
+      <div className="flex justify-between border-t-4 border-double border-black px-2 py-1 text-sm font-bold">
+        <span>GRAND TOTAL &mdash; {orders.length} order{orders.length !== 1 ? "s" : ""}</span>
         <span>INR {grandTotal}</span>
       </div>
     </div>
