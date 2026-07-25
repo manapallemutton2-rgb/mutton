@@ -170,9 +170,9 @@ function StatsTab() {
 
   // Overall stats
   const totalOrders = allOrders.length;
-  const totalRevenue = allOrders.reduce((s, o) => s + Number(o.total), 0);
+  const totalRevenue = Math.round(allOrders.reduce((s, o) => s + Number(o.total), 0));
   const uniqueCustomers = new Set(allOrders.map((o) => o.phone)).size;
-  const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+  const avgOrderValue = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
 
   // Per community stats
   const communityMap = new Map<string, Order[]>();
@@ -186,7 +186,7 @@ function StatsTab() {
     .map(([name, orders]) => ({
       name,
       orders: orders.length,
-      revenue: orders.reduce((s, o) => s + Number(o.total), 0),
+      revenue: Math.round(orders.reduce((s, o) => s + Number(o.total), 0)),
       customers: new Set(orders.map((o) => o.phone)).size,
     }))
     .sort((a, b) => b.revenue - a.revenue);
@@ -204,7 +204,7 @@ function StatsTab() {
     .map(([name, orders]) => ({
       name,
       orders: orders.length,
-      revenue: orders.reduce((s, o) => s + Number(o.total), 0),
+      revenue: Math.round(orders.reduce((s, o) => s + Number(o.total), 0)),
       customers: new Set(orders.map((o) => o.phone)).size,
     }))
     .sort((a, b) => b.revenue - a.revenue);
@@ -212,7 +212,7 @@ function StatsTab() {
   // Today's stats
   const today = new Date().toDateString();
   const todayOrders = allOrders.filter((o) => new Date(o.created_at).toDateString() === today);
-  const todayRevenue = todayOrders.reduce((s, o) => s + Number(o.total), 0);
+  const todayRevenue = Math.round(todayOrders.reduce((s, o) => s + Number(o.total), 0));
 
   return (
     <div className="space-y-6">
@@ -228,7 +228,7 @@ function StatsTab() {
           <div className="flex items-center gap-2 text-base text-muted-foreground">
             <IndianRupee className="h-5 w-5" /> Total Revenue
           </div>
-          <div className="mt-2 text-3xl font-bold">INR {totalRevenue.toFixed(0)}</div>
+          <div className="mt-2 text-3xl font-bold">INR {totalRevenue}</div>
         </div>
         <div className="rounded-xl border bg-card p-6">
           <div className="flex items-center gap-2 text-base text-muted-foreground">
@@ -240,7 +240,7 @@ function StatsTab() {
           <div className="flex items-center gap-2 text-base text-muted-foreground">
             <TrendingUp className="h-5 w-5" /> Avg Order
           </div>
-          <div className="mt-2 text-3xl font-bold">INR {avgOrderValue.toFixed(0)}</div>
+          <div className="mt-2 text-3xl font-bold">INR {avgOrderValue}</div>
         </div>
       </div>
 
@@ -249,7 +249,7 @@ function StatsTab() {
         <h3 className="mb-3 text-lg font-semibold">Today's Summary</h3>
         <div className="flex flex-wrap gap-4 text-base sm:gap-8">
           <span className="font-medium">{todayOrders.length} orders</span>
-          <span className="font-bold text-primary">INR {todayRevenue.toFixed(0)} revenue</span>
+          <span className="font-bold text-primary">INR {todayRevenue} revenue</span>
         </div>
       </div>
 
@@ -276,8 +276,8 @@ function StatsTab() {
                     <td className="p-2 font-medium">{c.name}</td>
                     <td className="p-2 text-right">{c.orders}</td>
                     <td className="p-2 text-right">{c.customers}</td>
-                    <td className="p-2 text-right font-medium">INR {c.revenue.toFixed(0)}</td>
-                    <td className="p-2 text-right">INR {(c.revenue / c.orders).toFixed(0)}</td>
+                    <td className="p-2 text-right font-medium">INR {c.revenue}</td>
+                    <td className="p-2 text-right">INR {Math.round(c.revenue / c.orders)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -309,8 +309,8 @@ function StatsTab() {
                     <td className="p-2 font-medium">{b.name}</td>
                     <td className="p-2 text-right">{b.orders}</td>
                     <td className="p-2 text-right">{b.customers}</td>
-                    <td className="p-2 text-right font-medium">INR {b.revenue.toFixed(0)}</td>
-                    <td className="p-2 text-right">INR {(b.revenue / b.orders).toFixed(0)}</td>
+                    <td className="p-2 text-right font-medium">INR {b.revenue}</td>
+                    <td className="p-2 text-right">INR {Math.round(b.revenue / b.orders)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -604,7 +604,7 @@ function OrdersTab() {
                 {newOrderAlert.community_name} / {newOrderAlert.block_name}
               </p>
               <p className="text-sm font-semibold text-green-700 dark:text-green-300">
-                INR {Number(newOrderAlert.total).toFixed(0)} | {newOrderAlert.phone}
+                INR {Math.round(Number(newOrderAlert.total))} | {newOrderAlert.phone}
               </p>
               {newOrderAlert.packing_note && (
                 <p className="mt-1 text-xs text-yellow-700">Note: {newOrderAlert.packing_note}</p>
@@ -853,7 +853,7 @@ function OrdersTab() {
               )}
               <div className="mt-3 flex justify-between border-t pt-3 font-bold text-base">
                 <span>Total</span>
-                <span className="text-primary text-lg">INR {Number(o.total).toFixed(0)}</span>
+                <span className="text-primary text-lg">INR {Math.round(Number(o.total))}</span>
               </div>
             </div>
           ))}
@@ -892,7 +892,7 @@ function OrdersTab() {
                   <td className="p-3">{o.alt_phone || "-"}</td>
                   <td className="p-3">{o.community_name}</td>
                   <td className="p-3">{o.block_name}</td>
-                  <td className="p-3 text-right font-semibold">INR {Number(o.total).toFixed(0)}</td>
+                  <td className="p-3 text-right font-semibold">INR {Math.round(Number(o.total))}</td>
                   <td className="p-3 text-right">
                     <div className="flex justify-end gap-2">
                       {isPrinterConnected() && (
@@ -940,7 +940,7 @@ function PrintSheet({
   items: OrderItem[];
 }) {
   const blocks = Array.from(new Set(orders.map((o) => o.block_name))).sort();
-  const grandTotal = orders.reduce((s, o) => s + Number(o.total), 0);
+  const grandTotal = Math.round(orders.reduce((s, o) => s + Number(o.total), 0));
 
   return (
     <div className="print-page a4-only rounded-lg border bg-white p-6 text-black">
@@ -961,7 +961,7 @@ function PrintSheet({
 
       {blocks.map((blockName) => {
         const blockOrders = orders.filter((o) => o.block_name === blockName);
-        const blockTotal = blockOrders.reduce((s, o) => s + Number(o.total), 0);
+        const blockTotal = Math.round(blockOrders.reduce((s, o) => s + Number(o.total), 0));
         return (
           <div key={blockName} className="mb-6">
             <h2 className="mb-2 border-b-2 border-black bg-gray-100 px-3 py-1 text-base font-bold">
@@ -993,36 +993,39 @@ function PrintSheet({
                       </tr>
                     </thead>
                     <tbody>
-                      {oItems.map((it) => (
-                        <tr key={it.id} className="border-b border-gray-100">
-                          <td className="py-1">{it.product_name}</td>
-                          <td className="py-1 text-center">
-                            {it.quantity} {it.unit}
-                          </td>
-                          <td className="py-1 text-right">
-                            INR {(Number(it.price) * Number(it.quantity)).toFixed(0)}
-                          </td>
-                        </tr>
-                      ))}
+                      {oItems.map((it) => {
+                        const lineAmt = Math.round(Number(it.price) * Number(it.quantity));
+                        return (
+                          <tr key={it.id} className="border-b border-gray-100">
+                            <td className="py-1">{it.product_name}</td>
+                            <td className="py-1 text-center">
+                              {it.quantity} {it.unit}
+                            </td>
+                            <td className="py-1 text-right">
+                              INR {lineAmt}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                   <div className="mt-1 flex justify-between border-t-2 border-black pt-1 font-bold">
                     <span>Order Total</span>
-                    <span>INR {Number(o.total).toFixed(0)}</span>
+                    <span>INR {Math.round(Number(o.total))}</span>
                   </div>
                 </div>
               );
             })}
             <div className="flex justify-between border-t-2 border-black bg-gray-100 px-3 py-1 text-sm font-bold">
               <span>Block {blockName} Subtotal</span>
-              <span>INR {blockTotal.toFixed(0)}</span>
+              <span>INR {blockTotal}</span>
             </div>
           </div>
         );
       })}
       <div className="flex justify-between border-t-4 border-double border-black px-3 py-2 text-lg font-bold">
         <span>GRAND TOTAL ({orders.length} orders)</span>
-        <span>INR {grandTotal.toFixed(0)}</span>
+        <span>INR {grandTotal}</span>
       </div>
     </div>
   );
@@ -1047,7 +1050,7 @@ function ThermalSheet({
     <div className="thermal-only">
       {blocks.map((blockName) => {
         const bOrders = blockName ? orders.filter((o) => o.block_name === blockName) : orders;
-        const bTotal = bOrders.reduce((s, o) => s + Number(o.total), 0);
+        const bTotal = Math.round(bOrders.reduce((s, o) => s + Number(o.total), 0));
         return (
           <div key={blockName ?? "all"} className="thermal-page">
             <div className="thermal-receipt">
@@ -1092,18 +1095,20 @@ function ThermalSheet({
                     )}
                     <table style={{ marginTop: "1mm" }}>
                       <tbody>
-                        {oItems.map((it) => (
-                          <tr key={it.id}>
-                            <td style={{ fontSize: 11 }}>{it.product_name}</td>
-                            <td style={{ textAlign: "center", fontSize: 11 }}>
-                              {it.quantity}
-                              {it.unit}
-                            </td>
-                            <td style={{ textAlign: "right", fontSize: 11 }}>
-                              INR {(Number(it.price) * Number(it.quantity)).toFixed(0)}
-                            </td>
-                          </tr>
-                        ))}
+                        {oItems.map((it) => {
+                          const lineAmt = Math.round(Number(it.price) * Number(it.quantity));
+                          return (
+                            <tr key={it.id}>
+                              <td style={{ fontSize: 11 }}>{it.product_name}</td>
+                              <td style={{ textAlign: "center", fontSize: 11 }}>
+                                {it.unit}
+                              </td>
+                              <td style={{ textAlign: "right", fontSize: 11 }}>
+                                INR {lineAmt}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                     <div
@@ -1116,7 +1121,7 @@ function ThermalSheet({
                       }}
                     >
                       <span>Total</span>
-                      <span>INR {Number(o.total).toFixed(0)}</span>
+                      <span>INR {Math.round(Number(o.total))}</span>
                     </div>
                     <div className="divider" />
                   </div>
@@ -1125,7 +1130,7 @@ function ThermalSheet({
               <div className="divider-solid" />
               <div className="row" style={{ fontWeight: 800, fontSize: 13 }}>
                 <span>{blockName ? `Block ${blockName}` : "GRAND"} TOTAL</span>
-                <span>INR {bTotal.toFixed(0)}</span>
+                <span>INR {bTotal}</span>
               </div>
               <div
                 style={{
@@ -1490,7 +1495,7 @@ function ProductsTab() {
                     {p.image_url && (
                       <button
                         onClick={() =>
-                          removeImageMutation.mutate({ productId: p.id, imageUrl: p.image_url })
+                          removeImageMutation.mutate({ productId: p.id, imageUrl: p.image_url! })
                         }
                         disabled={removeImageMutation.isPending}
                         className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 hover:bg-red-100 disabled:opacity-50"

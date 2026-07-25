@@ -314,24 +314,26 @@ function CheckoutPage() {
                 <div className="divider" />
                 <table style={{ marginTop: "1mm" }}>
                   <tbody>
-                    {doneItems.map((it, idx) => (
-                      <tr key={idx}>
-                        <td style={{ fontSize: 11 }}>{it.product_name}</td>
-                        <td style={{ textAlign: "center", fontSize: 11 }}>
-                          {it.quantity}
-                          {it.unit}
-                        </td>
-                        <td style={{ textAlign: "right", fontSize: 11 }}>
-                          INR {(Number(it.price) * Number(it.quantity)).toFixed(0)}
-                        </td>
-                      </tr>
-                    ))}
+                    {doneItems.map((it, idx) => {
+                      const lineAmt = Math.round(Number(it.price) * Number(it.quantity));
+                      return (
+                        <tr key={idx}>
+                          <td style={{ fontSize: 11 }}>{it.product_name}</td>
+                          <td style={{ textAlign: "center", fontSize: 11 }}>
+                            {it.unit}
+                          </td>
+                          <td style={{ textAlign: "right", fontSize: 11 }}>
+                            INR {lineAmt}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
                 <div className="divider" />
                 <div className="row" style={{ fontWeight: 800, fontSize: 13 }}>
                   <span>TOTAL</span>
-                  <span>INR {Number(doneOrder.total).toFixed(0)}</span>
+                  <span>INR {Math.round(Number(doneOrder.total))}</span>
                 </div>
                 <div
                   style={{
@@ -490,7 +492,7 @@ function CheckoutPage() {
                     <span className="text-muted-foreground">
                       {i.name} x {i.quantity} {i.unit}
                     </span>
-                    <span className="font-medium">INR {(i.price * i.quantity).toFixed(0)}</span>
+                    <span className="font-medium">INR {Math.round(i.price * i.quantity)}</span>
                   </div>
                 ))}
               </div>
@@ -501,7 +503,7 @@ function CheckoutPage() {
                 </div>
                 <div className="mt-2 flex justify-between text-lg font-bold sm:mt-3 sm:text-xl">
                   <span>Total</span>
-                  <span className="text-primary">INR {total.toFixed(0)}</span>
+                  <span className="text-primary">INR {Math.round(total)}</span>
                 </div>
               </div>
               {error && (

@@ -12,6 +12,8 @@ export const Route = createFileRoute("/cart")({
   head: () => ({ meta: [{ title: "Cart - Manapalle Mutton" }] }),
 });
 
+const step = (unit: string) => (unit.includes("g") || unit === "kg" ? 0.5 : 1);
+
 function CartPage() {
   const navigate = useNavigate();
   const [items, setItems] = useState<CartItem[]>([]);
@@ -102,7 +104,7 @@ function CartPage() {
                   </div>
                   <div className="flex items-center gap-1 rounded-xl border bg-background">
                     <button
-                      onClick={() => updateQty(item.product_id, item.quantity - 0.5)}
+                      onClick={() => updateQty(item.product_id, item.quantity - step(item.unit))}
                       className="flex h-10 w-10 items-center justify-center rounded-l-xl transition hover:bg-muted sm:h-12 sm:w-12"
                     >
                       <Minus className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -111,14 +113,14 @@ function CartPage() {
                       {item.quantity}
                     </span>
                     <button
-                      onClick={() => updateQty(item.product_id, item.quantity + 0.5)}
+                      onClick={() => updateQty(item.product_id, item.quantity + step(item.unit))}
                       className="flex h-10 w-10 items-center justify-center rounded-r-xl transition hover:bg-muted sm:h-12 sm:w-12"
                     >
                       <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
                     </button>
                   </div>
                   <div className="ml-auto text-base font-bold text-primary sm:w-24 sm:text-xl">
-                    INR {(item.price * item.quantity).toFixed(0)}
+                    INR {Math.round(item.price * item.quantity)}
                   </div>
                   <button
                     onClick={() => removeFromCart(item.product_id)}
@@ -137,7 +139,7 @@ function CartPage() {
                 <div className="space-y-3 text-sm sm:space-y-4 sm:text-base">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Items ({itemCount})</span>
-                    <span className="font-medium">INR {total.toFixed(0)}</span>
+                    <span className="font-medium">INR {Math.round(total)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Delivery</span>
@@ -146,7 +148,7 @@ function CartPage() {
                   <div className="border-t pt-3 sm:pt-4">
                     <div className="flex justify-between text-lg font-bold sm:text-xl">
                       <span>Total</span>
-                      <span className="text-primary">INR {total.toFixed(0)}</span>
+                      <span className="text-primary">INR {Math.round(total)}</span>
                     </div>
                   </div>
                 </div>

@@ -325,7 +325,7 @@ export function AppHeader({ title }: { title?: string }) {
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="text-base font-bold text-primary">
-                          INR {Number(order.total).toFixed(0)}
+                          INR {Math.round(Number(order.total))}
                         </span>
                         {isExpanded ? (
                           <ChevronUp className="h-5 w-5 text-muted-foreground" />
@@ -353,7 +353,7 @@ export function AppHeader({ title }: { title?: string }) {
                                   {it.quantity} {it.unit}
                                 </td>
                                 <td className="py-1.5 text-right">
-                                  INR {(Number(it.price) * Number(it.quantity)).toFixed(0)}
+                                  INR {Math.round(Number(it.price) * Number(it.quantity))}
                                 </td>
                               </tr>
                             ))}
@@ -361,7 +361,7 @@ export function AppHeader({ title }: { title?: string }) {
                         </table>
                         <div className="mt-2 flex justify-between border-t pt-2 text-sm font-bold">
                           <span>Total</span>
-                          <span className="text-primary">INR {Number(order.total).toFixed(0)}</span>
+                          <span className="text-primary">INR {Math.round(Number(order.total))}</span>
                         </div>
                       </div>
                     )}
