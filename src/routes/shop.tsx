@@ -32,7 +32,6 @@ export const Route = createFileRoute("/shop")({
 function ShopPage() {
   const navigate = useNavigate();
   const [added, setAdded] = useState<string | null>(null);
-  const [selectedSize, setSelectedSize] = useState<Record<string, string>>({});
   const [search, setSearch] = useState("");
 
   useEffect(() => {
@@ -110,7 +109,7 @@ function ShopPage() {
     if (p.stock != null && inCartQty >= p.stock) {
       return;
     }
-    addToCart({ product_id: p.id, name: `${p.name} (${sizeLabel})`, unit: sizeLabel, price: sizePrice }, 1);
+    addToCart({ product_id: p.id, name: p.name, unit: sizeLabel, price: sizePrice }, 1);
     const key = p.id + "|" + sizeLabel;
     setAdded(key);
     setTimeout(() => setAdded(null), 1000);
@@ -232,8 +231,8 @@ function ShopPage() {
                             <div
                               key={size.label}
                               className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5 sm:px-4 sm:py-3 ${
-                                selectedSize[p.id] === size.label ? "border-primary bg-primary/5" : ""
-                              }`}
+                                 isAdded ? "border-green-400 bg-green-50" : ""
+                               }`}
                             >
                               <div className="min-w-0 flex-1">
                                 <span className="text-sm font-medium sm:text-base">{size.label}</span>

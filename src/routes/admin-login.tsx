@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { ShieldCheck, Lock, User, Loader2 } from "lucide-react";
+import { ShieldCheck, Lock, User, Loader2, Eye, EyeOff } from "lucide-react";
 import { setSession, getRole } from "@/lib/session";
 import { validateAdminLogin } from "@/lib/admin-auth.server";
 
@@ -18,6 +18,7 @@ function AdminLoginPage() {
   const navigate = useNavigate();
   const [adminId, setAdminId] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -94,13 +95,21 @@ function AdminLoginPage() {
                 <Lock className="h-5 w-5 text-muted-foreground" />
               </span>
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter password"
                 className="w-full bg-transparent px-4 py-3 text-base outline-none"
                 disabled={loading}
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="flex items-center px-4 py-3 text-muted-foreground hover:text-foreground"
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
             </div>
           </div>
 
