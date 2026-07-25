@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Plus, Search, ShoppingCart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,6 +17,49 @@ type Product = {
   image_url?: string | null;
   stock?: number | null;
 };
+
+type ProductGroup = {
+  baseName: string;
+  variants: Product[];
+};
+
+const SIZE_PATTERN = /^(.+?)\s+(\d+(?:\.\d+)?(?:kg|g))$/i;
+
+function parseProduct(name: string): { baseName: string; size: string | null } {
+  const m = name.match(SIZE_PATTERN);
+  if (m) return { baseName: m[1].trim(), size: m[2].toLowerCase() };
+  return { baseName: name, size: null };
+}
+
+function groupProducts(products: Product[]): ProductGroup[] {
+  const groups = new Map<string, Product[]>();
+  for (const p of products) {
+    const { baseName } = parseProduct(p.name);
+    if (!groups.has(baseName)) groups.set(baseName, []);
+    groups.get(baseName)!.push(p);
+  }
+  return Array.from(groups.entries())
+    .map(([baseName, variants]) => ({
+      baseName,
+      variants: variants.sort((a, b) => {
+        const aSize = parseProduct(a.name).size;
+        const bSize = parseProduct(b.name).size;
+        if (aSize && bSize) {
+          const aNum = parseFloat(aSize);
+          const bNum = parseFloat(bSize);
+          if (aNum !== bNum) return aNum - bNum;
+        }
+        return a.name.localeCompare(b.name);
+      }),
+    }))
+    .sort((a, b) => {
+      const aIsMutton = a.baseName.toLowerCase().startsWith("mutton");
+      const bIsMutton = b.baseName.toLowerCase().startsWith("mutton");
+      if (aIsMutton && !bIsMutton) return -1;
+      if (!aIsMutton && bIsMutton) return 1;
+      return a.baseName.localeCompare(b.baseName);
+    });
+}
 
 export const Route = createFileRoute("/shop")({
   component: ShopPage,
@@ -94,7 +137,13 @@ function ShopPage() {
   }, [queryClient]);
 
   const cartCount = getCart().reduce((s, i) => s + i.quantity, 0);
-  const filtered = products.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()));
+
+  const groups = useMemo(() => groupProducts(products), [products]);
+  const filtered = useMemo(
+    () =>
+      groups.filter((g) => g.baseName.toLowerCase().includes(search.toLowerCase())),
+    [groups, search],
+  );
 
   const add = (p: Product) => {
     const cart = getCart();
@@ -208,73 +257,82 @@ function ShopPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
-            {filtered.map((p, idx) => (
-              <div
-                key={p.id}
-                className={`animate-slide-up stagger-${Math.min(idx + 1, 6)} group flex flex-col overflow-hidden rounded-2xl border bg-card shadow-sm transition hover:shadow-lg`}
-              >
-                <div className="relative h-40 shrink-0 overflow-hidden sm:h-52">
-                  {p.image_url ? (
-                    <img
-                      src={p.image_url}
-                      alt={p.name}
-                      className="h-full w-full object-cover transition duration-500 group-hover:scale-110"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-muted text-sm text-muted-foreground">
-                      No Image
+            {filtered.map((group, idx) => {
+              const imageUrl = group.variants.find((v) => v.image_url)?.image_url;
+              return (
+                <div
+                  key={group.baseName}
+                  className={`animate-slide-up stagger-${Math.min(idx + 1, 6)} group flex flex-col overflow-hidden rounded-2xl border bg-card shadow-sm transition hover:shadow-lg`}
+                >
+                  <div className="relative h-40 shrink-0 overflow-hidden sm:h-52">
+                    {imageUrl ? (
+                      <img
+                        src={imageUrl}
+                        alt={group.baseName}
+                        className="h-full w-full object-cover transition duration-500 group-hover:scale-110"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-muted text-sm text-muted-foreground">
+                        No Image
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-1 flex-col justify-between p-4 sm:p-6">
+                    <div>
+                      <h3 className="text-lg font-semibold sm:text-xl">{group.baseName}</h3>
                     </div>
-                  )}
+                    <div className="mt-4 space-y-2">
+                      {group.variants.map((v) => {
+                        const outOfStock = !ordersOpen || (v.stock != null && (getCart().find((c) => c.product_id === v.id)?.quantity ?? 0) >= v.stock);
+                        const isAdded = added === v.id;
+                        return (
+                          <div
+                            key={v.id}
+                            className="flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5 sm:px-4 sm:py-3"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <span className="text-sm font-medium sm:text-base">
+                                {parseProduct(v.name).size || v.unit}
+                              </span>
+                              <span className="ml-2 text-sm text-muted-foreground">
+                                INR {Number(v.price).toFixed(0)}
+                              </span>
+                              {v.stock != null && (
+                                <span className={`ml-2 text-xs ${outOfStock ? "text-red-500" : "text-green-600"}`}>
+                                  {outOfStock ? "Out" : `${v.stock - (getCart().find((c) => c.product_id === v.id)?.quantity ?? 0)} left`}
+                                </span>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => add(v)}
+                              disabled={!ordersOpen || outOfStock}
+                              className={`flex shrink-0 items-center justify-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition sm:px-4 sm:py-2 sm:text-sm ${
+                                isAdded
+                                  ? "bg-green-600 text-white"
+                                  : !ordersOpen || outOfStock
+                                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                    : "bg-primary text-primary-foreground hover:opacity-90 active:scale-[0.98]"
+                              }`}
+                            >
+                              {isAdded ? (
+                                <Check className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                              ) : !ordersOpen ? (
+                                "Closed"
+                              ) : outOfStock ? (
+                                "Out"
+                              ) : (
+                                <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                              )}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
-                <div className="flex flex-1 flex-col justify-between p-4 sm:p-6">
-                  <div>
-                    <h3 className="text-lg font-semibold sm:text-xl">{p.name}</h3>
-                    <p className="mt-0.5 text-sm text-muted-foreground sm:text-base">
-                      per {p.unit}
-                    </p>
-                  </div>
-                  <div className="mt-3 flex items-center gap-2 text-xs sm:text-sm">
-                    <span
-                      className={`font-medium ${isOutOfStock(p) ? "text-red-500" : "text-green-600"}`}
-                    >
-                      {stockLabel(p)}
-                    </span>
-                  </div>
-                  <div className="mt-4 flex items-center justify-between gap-3">
-                    <span className="text-xl font-bold text-primary sm:text-2xl">
-                      INR {Number(p.price).toFixed(0)}
-                    </span>
-                    <button
-                      onClick={() => add(p)}
-                      disabled={!ordersOpen || isOutOfStock(p)}
-                      className={`flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition sm:px-6 sm:py-3.5 sm:text-base ${
-                        added === p.id
-                          ? "bg-green-600 text-white"
-                          : !ordersOpen || isOutOfStock(p)
-                            ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                            : "bg-primary text-primary-foreground hover:opacity-90 active:scale-[0.98]"
-                      }`}
-                    >
-                      {added === p.id ? (
-                        <>
-                          <Check className="h-4 w-4 sm:h-5 sm:w-5" /> Added
-                        </>
-                      ) : (
-                        <>
-                          <Plus className="h-4 w-4 sm:h-5 sm:w-5" />{" "}
-                          {!ordersOpen
-                            ? "Orders Closed"
-                            : isOutOfStock(p)
-                              ? "Out of Stock"
-                              : "Add to Cart"}
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 

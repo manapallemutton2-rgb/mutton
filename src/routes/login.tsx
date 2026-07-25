@@ -47,7 +47,7 @@ function LoginPage() {
       return;
     }
     setSession(name.trim(), phone, "user");
-    navigate({ to: "/shop" });
+    window.location.href = "/shop";
   };
 
   return (
@@ -177,10 +177,9 @@ function LoginPage() {
           <div className="mt-10 lg:hidden">
             <AboutSection />
             <div className="mt-4 space-y-1 rounded-xl bg-muted/30 px-5 py-4 text-sm text-muted-foreground">
-              <p>G-3, Vaishnavi Towers, Sri Lakshmi Nagar Colony,</p>
-              <p>Near Marrichettu Junction, Manikonda,</p>
-              <p>Hyderabad - 500089.</p>
-              <p className="pt-1 font-semibold text-primary">Cell: 9030901233</p>
+          <p>Village Gungal, Yacharam Mandal,</p>
+          <p>K.V.Rangareddy District - 501506</p>
+          <p className="pt-1 font-semibold text-primary">Cell: 9030901233</p>
             </div>
           </div>
         </div>

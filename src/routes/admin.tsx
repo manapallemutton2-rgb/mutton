@@ -1387,6 +1387,7 @@ function ProductsTab() {
             <tr>
               <th className="p-3">Image</th>
               <th className="p-3">Name</th>
+              <th className="p-3">Group</th>
               <th className="p-3">Unit</th>
               <th className="p-3">Price</th>
               <th className="p-3">Stock</th>
@@ -1418,6 +1419,12 @@ function ProductsTab() {
                     className="w-full min-w-[120px] rounded-xl border bg-background px-3 py-2 text-base"
                   />
                 </td>
+                <td className="p-3 text-sm text-muted-foreground">
+                  {(() => {
+                    const m = p.name.match(/^(.+?)\s+(\d+(?:\.\d+)?(?:kg|g))$/i);
+                    return m ? m[1].trim() : "—";
+                  })()}
+                </td>
                 <td className="p-3">
                   <select
                     defaultValue={p.unit}
@@ -1425,10 +1432,11 @@ function ProductsTab() {
                     className="rounded-xl border bg-background px-3 py-2 text-base"
                   >
                     <option value="kg">kg</option>
-                    <option value="500g">500g</option>
-                    <option value="dozen">dozen</option>
-                    <option value="piece">piece</option>
-                  </select>
+              <option value="500g">500g</option>
+              <option value="750g">750g</option>
+              <option value="dozen">dozen</option>
+              <option value="piece">piece</option>
+            </select>
                 </td>
                 <td className="p-3">
                   <input
