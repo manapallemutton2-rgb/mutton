@@ -15,9 +15,11 @@ export function AboutSection() {
         </div>
       </div>
       <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-        We bring the finest quality meat directly from village farms to your
-        doorstep. Partnering with trusted local farmers who raise livestock
-        naturally, every cut is fresh, healthy, and full of authentic flavor.
+        Our Male sheeps(గొర్రె పొట్టేలు) are raised the way nature intended—grazing
+        on natural feed in village farms without artificial shortcuts. We source
+        fresh, naturally raised mutton directly from trusted local sheep farmers
+        and deliver it straight to your doorstep, ensuring authentic taste,
+        freshness, and quality in every cut.
       </p>
       <div className="mt-5 grid grid-cols-2 gap-2 sm:gap-3">
         {["/1.jpeg", "/2.jpeg", "/3.jpeg", "/4.jpeg"].map((src) => (
