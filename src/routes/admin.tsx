@@ -521,9 +521,9 @@ function OrdersTab() {
         setTimeout(() => {
           document.body.classList.remove("printing-thermal");
           setPrintScope(null);
-        }, 500);
-      }, 200);
-    }, 300);
+        }, 1000);
+      }, 500);
+    }, 500);
   }, []);
 
   const doBtPrint = useCallback(
@@ -1101,7 +1101,7 @@ function ThermalSheet({
               const oItems = items.filter((i) => i.order_id === o.id);
               const showAlt = o.alt_phone && o.alt_phone !== o.phone;
               return (
-                <div key={o.id} className={idx < bOrders.length - 1 ? "thermal-page" : ""}>
+                <div key={o.id} className={"thermal-order" + (idx < bOrders.length - 1 ? " thermal-page" : "")}>
                   <div className="thermal-receipt">
                     <div style={{ textAlign: "center" }}>
                       <img src="/MM.jpeg" alt="Logo" style={{ height: 48, margin: "0 auto" }} />

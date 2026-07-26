@@ -204,6 +204,12 @@
   background: #fff;
   padding: 2mm;
   line-height: 1.4;
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+}
+.thermal-receipt img {
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
 }
 .thermal-receipt h1 {
   font-size: 16px;
@@ -231,9 +237,14 @@
 }
 .thermal-page {
   page-break-after: always;
+  break-after: page;
 }
 .thermal-page:last-child {
   page-break-after: auto;
+  break-after: auto;
+}
+.thermal-order {
+  page-break-inside: avoid;
 }
 @page {
   size: A4;
