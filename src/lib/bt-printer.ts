@@ -186,21 +186,24 @@ function lineChar(width: number, char = "-"): string {
 
 async function sendBytes(data: Uint8Array) {
   if (!btCharacteristic) throw new Error("Printer not connected");
-  const chunkSize = 200;
-  for (let i = 0; i < data.length; i += chunkSize) {
-    const chunk = data.slice(i, i + chunkSize);
+  const useResponse = btCharacteristic.properties.write && !btCharacteristic.properties.writeWithoutResponse;
+  const CHUNK = 20;
+  for (let i = 0; i < data.length; i += CHUNK) {
+    const chunk = data.slice(i, i + CHUNK);
     try {
-      await btCharacteristic.writeValueWithoutResponse(chunk);
-    } catch (e) {
+      if (useResponse) {
+        await btCharacteristic.writeValueWithResponse(chunk);
+      } else {
+        await btCharacteristic.writeValueWithoutResponse(chunk);
+      }
+    } catch {
       try {
         await btCharacteristic.writeValueWithResponse(chunk);
       } catch (e2) {
         throw new Error("Write failed: " + (e2 as Error).message);
       }
     }
-    if (i + chunkSize < data.length) {
-      await new Promise((r) => setTimeout(r, 20));
-    }
+    await new Promise((r) => setTimeout(r, 50));
   }
 }
 
@@ -281,8 +284,16 @@ export async function printReceipt(receipt: ReceiptData): Promise<boolean> {
     const ESC_LEFT = new Uint8Array([0x1b, 0x61, 0x00]);
     const LF = new Uint8Array([0x0a]);
     const CUT = new Uint8Array([0x1d, 0x56, 0x00]);
+    const PRINT_DENSITY = new Uint8Array([0x1b, 0x37, 0x07, 0x7f]);
 
-    const parts: Uint8Array[] = [ESC_INIT, ESC_CENTER];
+    const parts: Uint8Array[] = [];
+
+    // wake-up: send init 3 times
+    parts.push(ESC_INIT);
+    parts.push(ESC_INIT);
+    parts.push(ESC_INIT);
+    parts.push(PRINT_DENSITY);
+    parts.push(ESC_CENTER);
 
     for (const line of lines) {
       if (line === "") {
@@ -294,6 +305,9 @@ export async function printReceipt(receipt: ReceiptData): Promise<boolean> {
       }
     }
 
+    parts.push(LF);
+    parts.push(LF);
+    parts.push(LF);
     parts.push(CUT);
 
     let totalLen = 0;
