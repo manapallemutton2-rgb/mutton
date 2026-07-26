@@ -228,6 +228,27 @@ export interface ReceiptData {
   date?: string;
 }
 
+export async function printMultipleReceipts(receipts: ReceiptData[]): Promise<boolean> {
+  if (!btCharacteristic) {
+    btLog("No printer connected");
+    return false;
+  }
+  let success = true;
+  for (let i = 0; i < receipts.length; i++) {
+    btLog(`Printing ${i + 1}/${receipts.length}...`);
+    const ok = await printReceipt(receipts[i]);
+    if (!ok) {
+      success = false;
+      break;
+    }
+    if (i < receipts.length - 1) {
+      await new Promise((r) => setTimeout(r, 500));
+    }
+  }
+  btLog(success ? "All receipts sent!" : "Batch print failed");
+  return success;
+}
+
 export async function printReceipt(receipt: ReceiptData): Promise<boolean> {
   if (!btCharacteristic) {
     btLog("No printer connected");

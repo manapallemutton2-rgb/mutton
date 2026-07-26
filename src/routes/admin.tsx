@@ -19,7 +19,7 @@ import {
 import { AppHeader } from "@/components/AppHeader";
 import { supabase } from "@/integrations/supabase/client";
 import { getPhone, getRole } from "@/lib/session";
-import { isPrinterConnected, printReceipt as btPrintReceipt, ReceiptData } from "@/lib/bt-printer";
+import { isPrinterConnected, printReceipt as btPrintReceipt, printMultipleReceipts as btPrintMultiple, ReceiptData } from "@/lib/bt-printer";
 import {
   adminUpdateProduct,
   adminDeleteProduct,
@@ -553,6 +553,35 @@ function OrdersTab() {
     [items],
   );
 
+  const doBtPrintBatch = useCallback(
+    async (orders: Order[]) => {
+      const receipts: ReceiptData[] = orders.map((o) => {
+        const oItems = items.filter((i) => i.order_id === o.id);
+        return {
+          orderNumber: o.order_number,
+          customerName: o.customer_name,
+          flatNo: o.flat_no,
+          phone: o.phone,
+          altPhone: o.alt_phone,
+          communityName: o.community_name,
+          blockName: o.block_name,
+          packingNote: o.packing_note,
+          items: oItems.map((it) => ({
+            name: it.product_name,
+            unit: it.unit,
+            price: it.price,
+            quantity: it.quantity,
+          })),
+          total: o.total,
+          date: new Date(o.created_at).toLocaleString(),
+        };
+      });
+      const ok = await btPrintMultiple(receipts);
+      if (!ok) alert("Batch print failed. Check printer connection.");
+    },
+    [items],
+  );
+
   if (isLoading)
     return (
       <div className="space-y-3">
@@ -643,24 +672,32 @@ function OrdersTab() {
         <div className="no-print mb-6 rounded-lg border bg-card p-4">
           <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-lg font-semibold">{selectedCommunity.name}</h2>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <button
-                onClick={() =>
-                  doPrint("a4", { kind: "community", communityName: selectedCommunity.name })
-                }
-                className="flex items-center justify-center gap-1 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
-              >
-                <Printer className="h-4 w-4" /> A4
-              </button>
-              <button
-                onClick={() =>
-                  doPrint("thermal", { kind: "community", communityName: selectedCommunity.name })
-                }
-                className="flex items-center justify-center gap-1 rounded-md bg-secondary px-3 py-2 text-sm font-medium"
-              >
-                <Receipt className="h-4 w-4" /> Thermal (80mm)
-              </button>
-            </div>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button
+                  onClick={() =>
+                    doPrint("a4", { kind: "community", communityName: selectedCommunity.name })
+                  }
+                  className="flex items-center justify-center gap-1 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
+                >
+                  <Printer className="h-4 w-4" /> A4
+                </button>
+                <button
+                  onClick={() =>
+                    doPrint("thermal", { kind: "community", communityName: selectedCommunity.name })
+                  }
+                  className="flex items-center justify-center gap-1 rounded-md bg-secondary px-3 py-2 text-sm font-medium"
+                >
+                  <Receipt className="h-4 w-4" /> Thermal (80mm)
+                </button>
+                {isPrinterConnected() && (
+                  <button
+                    onClick={() => doBtPrintBatch(communityOrders)}
+                    className="flex items-center justify-center gap-1 rounded-md bg-green-700 px-3 py-2 text-sm font-medium text-white"
+                  >
+                    <Bluetooth className="h-4 w-4" /> BT Batch
+                  </button>
+                )}
+              </div>
           </div>
 
           {blocks.length === 0 && (
@@ -704,6 +741,14 @@ function OrdersTab() {
                     >
                       Thermal
                     </button>
+                    {isPrinterConnected() && (
+                      <button
+                        onClick={() => doBtPrintBatch(bOrders)}
+                        className="rounded bg-green-700 px-2 py-1 text-xs text-white"
+                      >
+                        BT
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -1050,31 +1095,27 @@ function ThermalSheet({
         const bOrders = blockName ? orders.filter((o) => o.block_name === blockName) : orders;
         const bTotal = Math.round(bOrders.reduce((s, o) => s + Number(o.total), 0));
         return (
-          <div key={blockName ?? "all"} className="thermal-page">
-            <div className="thermal-receipt">
-              <div style={{ textAlign: "center" }}>
-                <img src="/MM.jpeg" alt="Logo" style={{ height: 48, margin: "0 auto" }} />
-              </div>
-              <h1 style={{ textAlign: "center", fontSize: 16, letterSpacing: 1 }}>
-                MANAPALLE MUTTON
-              </h1>
-              <div style={{ textAlign: "center", fontSize: 10, marginBottom: "2mm" }}>
-                {new Date().toLocaleString()}
-              </div>
-              <div style={{ textAlign: "center", fontSize: 10, marginBottom: "2mm" }}>
-                Call: 9030 90 1233
-              </div>
-              <div className="divider-solid" />
-              <div style={{ textAlign: "center", fontWeight: 800, fontSize: 13 }}>{title}</div>
-              {blockName && (
-                <div style={{ textAlign: "center", fontWeight: 700 }}>Block: {blockName}</div>
-              )}
-              <div style={{ fontSize: 11 }}>Orders: {bOrders.length}</div>
-              <div className="divider-solid" />
-              {bOrders.map((o) => {
-                const oItems = items.filter((i) => i.order_id === o.id);
-                return (
-                  <div key={o.id} style={{ marginBottom: "3mm" }}>
+          <div key={blockName ?? "all"}>
+            {/* Each order gets its own full receipt */}
+            {bOrders.map((o, idx) => {
+              const oItems = items.filter((i) => i.order_id === o.id);
+              const showAlt = o.alt_phone && o.alt_phone !== o.phone;
+              return (
+                <div key={o.id} className={idx < bOrders.length - 1 ? "thermal-page" : ""}>
+                  <div className="thermal-receipt">
+                    <div style={{ textAlign: "center" }}>
+                      <img src="/MM.jpeg" alt="Logo" style={{ height: 48, margin: "0 auto" }} />
+                    </div>
+                    <h1 style={{ textAlign: "center", fontSize: 16, letterSpacing: 1 }}>
+                      MANAPALLE MUTTON
+                    </h1>
+                    <div style={{ textAlign: "center", fontSize: 10, marginBottom: "2mm" }}>
+                      {new Date(o.created_at).toLocaleString()}
+                    </div>
+                    <div style={{ textAlign: "center", fontSize: 10, marginBottom: "2mm" }}>
+                      Call: 9030 90 1233
+                    </div>
+                    <div className="divider-solid" />
                     <div
                       className="row"
                       style={{ borderBottom: "1px solid #000", paddingBottom: "1mm" }}
@@ -1085,23 +1126,34 @@ function ThermalSheet({
                     <div style={{ fontSize: 11 }}>
                       Flat: {o.flat_no || "-"} | {o.phone}
                     </div>
-                    {o.alt_phone && <div style={{ fontSize: 11 }}>Alt: {o.alt_phone}</div>}
+                    {showAlt && <div style={{ fontSize: 11 }}>Alt: {o.alt_phone}</div>}
+                    <div style={{ fontSize: 11, marginBottom: "1mm" }}>
+                      {o.community_name} / Block {o.block_name}
+                    </div>
                     {o.packing_note && (
-                      <div style={{ fontSize: 11, fontWeight: 800, marginTop: "1mm" }}>
+                      <div style={{ fontSize: 11, fontWeight: 800, marginTop: "1mm", marginBottom: "1mm" }}>
                         Note: {o.packing_note}
                       </div>
                     )}
                     <table style={{ marginTop: "1mm" }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px dashed #000" }}>
+                          <th style={{ fontSize: 11, textAlign: "left", paddingBottom: "0.5mm" }}>Item</th>
+                          <th style={{ fontSize: 11, textAlign: "center", paddingBottom: "0.5mm" }}>Qty</th>
+                          <th style={{ fontSize: 11, textAlign: "right", paddingBottom: "0.5mm" }}>Amt</th>
+                        </tr>
+                      </thead>
                       <tbody>
                         {oItems.map((it) => {
                           const lineAmt = Math.round(Number(it.price) * Number(it.quantity));
+                          const qtyDisplay = it.quantity === 1 ? it.unit : it.quantity + it.unit;
                           return (
                             <tr key={it.id}>
-                              <td style={{ fontSize: 11 }}>{it.product_name}</td>
-                              <td style={{ textAlign: "center", fontSize: 11 }}>
-                                {it.unit}
+                              <td style={{ fontSize: 11, paddingTop: "0.5mm" }}>{it.product_name}</td>
+                              <td style={{ textAlign: "center", fontSize: 11, paddingTop: "0.5mm" }}>
+                                {qtyDisplay}
                               </td>
-                              <td style={{ textAlign: "right", fontSize: 11 }}>
+                              <td style={{ textAlign: "right", fontSize: 11, paddingTop: "0.5mm" }}>
                                 INR {lineAmt}
                               </td>
                             </tr>
@@ -1112,36 +1164,67 @@ function ThermalSheet({
                     <div
                       className="row"
                       style={{
-                        borderTop: "1px dashed #000",
+                        borderTop: "2px solid #000",
                         marginTop: "1mm",
                         paddingTop: "1mm",
                         fontWeight: 800,
+                        fontSize: 13,
                       }}
                     >
-                      <span>Total</span>
+                      <span>TOTAL</span>
                       <span>INR {Math.round(Number(o.total))}</span>
                     </div>
-                    <div className="divider" />
+                    <div
+                      style={{
+                        textAlign: "center",
+                        marginTop: "2mm",
+                        fontSize: 10,
+                        borderTop: "1px dashed #000",
+                        paddingTop: "1mm",
+                      }}
+                    >
+                      Thank you! Visit again
+                    </div>
                   </div>
-                );
-              })}
-              <div className="divider-solid" />
-              <div className="row" style={{ fontWeight: 800, fontSize: 13 }}>
-                <span>{blockName ? `Block ${blockName}` : "GRAND"} TOTAL</span>
-                <span>INR {bTotal}</span>
+                </div>
+              );
+            })}
+            {/* Block summary page */}
+            {blocks.length > 1 && bOrders.length > 1 && (
+              <div className="thermal-page">
+                <div className="thermal-receipt">
+                  <div style={{ textAlign: "center" }}>
+                    <img src="/MM.jpeg" alt="Logo" style={{ height: 48, margin: "0 auto" }} />
+                  </div>
+                  <h1 style={{ textAlign: "center", fontSize: 16, letterSpacing: 1 }}>
+                    MANAPALLE MUTTON
+                  </h1>
+                  <div style={{ textAlign: "center", fontSize: 10, marginBottom: "2mm" }}>
+                    {new Date().toLocaleString()}
+                  </div>
+                  <div style={{ textAlign: "center", fontSize: 10, marginBottom: "2mm" }}>
+                    Call: 9030 90 1233
+                  </div>
+                  <div className="divider-solid" />
+                  <div style={{ textAlign: "center", fontWeight: 800, fontSize: 13 }}>
+                    {title} — {blockName ? `Block ${blockName}` : ""}
+                  </div>
+                  <div style={{ fontSize: 11 }}>Orders: {bOrders.length}</div>
+                  <div className="divider-solid" />
+                  {bOrders.map((o) => (
+                    <div key={o.id} className="row" style={{ fontSize: 11, marginBottom: "0.5mm" }}>
+                      <span>{o.customer_name} — {o.order_number}</span>
+                      <span>INR {Math.round(Number(o.total))}</span>
+                    </div>
+                  ))}
+                  <div className="divider-solid" />
+                  <div className="row" style={{ fontWeight: 800, fontSize: 13 }}>
+                    <span>{blockName ? `Block ${blockName}` : "GRAND"} TOTAL</span>
+                    <span>INR {bTotal}</span>
+                  </div>
+                </div>
               </div>
-              <div
-                style={{
-                  textAlign: "center",
-                  marginTop: "3mm",
-                  fontSize: 10,
-                  borderTop: "1px dashed #000",
-                  paddingTop: "1mm",
-                }}
-              >
-                Thank you! Visit again
-              </div>
-            </div>
+            )}
           </div>
         );
       })}
