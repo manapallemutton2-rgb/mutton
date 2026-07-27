@@ -18,14 +18,14 @@ function AboutPage() {
           <p>K.V.Rangareddy District - 501506</p>
           <p className="pt-1 font-semibold text-primary">Cell: 9030901233</p>
         </div>
-        <div className="mt-8 flex items-center justify-center gap-2 border-t pt-4 text-xs text-muted-foreground/50">
+        <div className="mt-8 flex items-center justify-center gap-2 border-t pt-4 text-sm font-semibold text-muted-foreground/60">
           <span>Powered by</span>
           <img
             src="/A+.jpeg"
-            alt="ech"
-            className="h-5 w-5 rounded object-contain"
+            alt="A+ Tech"
+            className="h-6 w-6 rounded object-contain"
           />
-          <span className="font-medium">A+ Tech Services</span>
+          <span className="font-bold">A+ Tech Services</span>
         </div>
       </main>
     </div>
