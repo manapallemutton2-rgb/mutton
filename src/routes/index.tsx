@@ -37,14 +37,18 @@ function Index() {
           Fresh from the Village, Straight to Your Home — 9030901233
         </p>
         <p className="mt-4 text-xl text-muted-foreground animate-pulse-soft">Loading...</p>
-        <div className="mt-8 flex items-center justify-center gap-2 text-sm font-semibold text-muted-foreground/60">
-          <span>Powered by</span>
-          <img
-            src="/A+.jpeg"
-            alt="A+ Tech"
-            className="h-6 w-6 rounded object-contain"
-          />
-          <span className="font-bold">A+ Tech Services</span>
+        <div className="mt-8 flex items-center justify-center">
+          <div className="inline-flex items-center gap-1.5 sm:gap-2 rounded-full bg-primary/10 px-3 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-bold text-primary shadow-sm ring-1 ring-primary/20">
+            <span>Powered by</span>
+            <a href="https://aplustechservices.in" target="_blank" rel="noopener noreferrer">
+              <img
+                src="/A+.jpeg"
+                alt="A+ Tech"
+                className="h-6 w-6 sm:h-8 sm:w-8 rounded object-contain"
+              />
+            </a>
+            <span className="font-extrabold">A+ Tech Services</span>
+          </div>
         </div>
       </div>
     </div>
