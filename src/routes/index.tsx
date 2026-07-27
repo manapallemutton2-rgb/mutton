@@ -37,6 +37,15 @@ function Index() {
           Fresh from the Village, Straight to Your Home — 9030901233
         </p>
         <p className="mt-4 text-xl text-muted-foreground animate-pulse-soft">Loading...</p>
+        <div className="mt-8 flex items-center justify-center gap-2 text-xs text-muted-foreground/50">
+          <span>Powered by</span>
+          <img
+            src="/A+.jpeg"
+            alt="A+ Tech"
+            className="h-5 w-5 rounded object-contain"
+          />
+          <span className="font-medium">A+ Tech Services</span>
+        </div>
       </div>
     </div>
   );

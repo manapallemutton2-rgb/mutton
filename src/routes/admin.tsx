@@ -122,6 +122,14 @@ function AdminPage() {
   );
 }
 
+function unitToKg(unit: string, quantity: number): number {
+  if (unit === "1kg") return quantity;
+  if (unit === "500g") return quantity * 0.5;
+  if (unit === "750g") return quantity * 0.75;
+  if (unit === "kg") return quantity;
+  return quantity;
+}
+
 /* ---------------- Stats ---------------- */
 function StatsTab() {
   const { data: allOrders = [], isLoading: loadingOrders } = useQuery<Order[]>({
@@ -136,6 +144,19 @@ function StatsTab() {
         return [];
       }
       return (data as Order[]) || [];
+    },
+    staleTime: 60_000,
+  });
+
+  const { data: items = [], isLoading: loadingItems } = useQuery<OrderItem[]>({
+    queryKey: ["admin", "order_items"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("order_items").select("*");
+      if (error) {
+        console.error("Failed to load order items:", error);
+        return [];
+      }
+      return (data as OrderItem[]) || [];
     },
     staleTime: 60_000,
   });
@@ -156,7 +177,7 @@ function StatsTab() {
     staleTime: 300_000,
   });
 
-  if (loadingOrders || loadingProducts)
+  if (loadingOrders || loadingItems || loadingProducts)
     return (
       <div className="space-y-3">
         {[1, 2, 3].map((i) => (
@@ -241,6 +262,38 @@ function StatsTab() {
             <TrendingUp className="h-5 w-5" /> Avg Order
           </div>
           <div className="mt-2 text-3xl font-bold">INR {avgOrderValue}</div>
+        </div>
+      </div>
+
+      {/* Mutton / Chicken sold */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="rounded-xl border bg-card p-6">
+          <div className="flex items-center gap-2 text-base text-muted-foreground">
+            Mutton Sold
+          </div>
+          <div className="mt-2 text-3xl font-bold text-primary">
+            {(() => {
+              const total = items
+                .filter((i) => i.product_name.toLowerCase().startsWith("mutton"))
+                .reduce((s, i) => s + unitToKg(i.unit, i.quantity), 0);
+              return total % 1 === 0 ? total.toFixed(0) : total.toFixed(2);
+            })()}{" "}
+            <span className="text-lg font-normal text-muted-foreground">kg</span>
+          </div>
+        </div>
+        <div className="rounded-xl border bg-card p-6">
+          <div className="flex items-center gap-2 text-base text-muted-foreground">
+            Chicken Sold
+          </div>
+          <div className="mt-2 text-3xl font-bold text-primary">
+            {(() => {
+              const total = items
+                .filter((i) => i.product_name.toLowerCase().startsWith("chicken"))
+                .reduce((s, i) => s + unitToKg(i.unit, i.quantity), 0);
+              return total % 1 === 0 ? total.toFixed(0) : total.toFixed(2);
+            })()}{" "}
+            <span className="text-lg font-normal text-muted-foreground">kg</span>
+          </div>
         </div>
       </div>
 

@@ -80,6 +80,15 @@ function LoginPage() {
             <p className="mt-1 text-sm text-muted-foreground">
               Fresh from the Village, Straight to Your Home — 9030901233
             </p>
+            <div className="mt-1 flex items-center justify-center gap-2 text-xs text-muted-foreground/50">
+              <span>Powered by</span>
+              <img
+                src="/A+.jpeg"
+                alt="A+ Tech"
+                className="h-5 w-5 rounded object-contain"
+              />
+              <span className="font-medium">A+ Tech Sevices</span>
+            </div>
           </div>
 
           <div className="mb-6">

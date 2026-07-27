@@ -1,5 +1,3 @@
-import { Leaf, Heart } from "lucide-react";
-
 export function Footer() {
   return (
     <footer className="mt-12 border-t bg-card py-8">
@@ -16,6 +14,15 @@ export function Footer() {
           <p className="flex items-center gap-1 text-xs text-muted-foreground/70">
             Fresh from the Village, Straight to Your Home — 9030901233
           </p>
+        </div>
+        <div className="mt-6 flex items-center justify-center gap-2 border-t pt-4 text-xs text-muted-foreground/50">
+          <span>Powered by</span>
+          <img
+            src="/A+.jpeg"
+            alt="A+ Tech"
+            className="h-5 w-5 rounded object-contain"
+          />
+          <span className="font-medium">A+ Tech Services</span>
         </div>
       </div>
     </footer>
