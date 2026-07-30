@@ -1604,6 +1604,18 @@ function ProductsTab() {
     staleTime: 300_000,
   });
 
+  useEffect(() => {
+    const channel = supabase
+      .channel("admin-products-stock")
+      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
   const addMutation = useMutation({
     mutationFn: async () => {
       await adminInsertProduct({
