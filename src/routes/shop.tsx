@@ -106,7 +106,10 @@ function ShopPage() {
     const cart = getCart();
     const inCart = cart.find((c) => c.product_id === p.id && c.unit === sizeLabel);
     const inCartQty = inCart ? inCart.quantity : 0;
-    if (p.stock != null && inCartQty >= p.stock) {
+    // Convert cart quantity to kg for stock comparison
+    const sizeMultiplier = SIZE_OPTIONS.find((s) => s.label === sizeLabel)?.multiplier ?? 1;
+    const cartKg = inCartQty * sizeMultiplier;
+    if (p.stock != null && cartKg >= p.stock) {
       return;
     }
     addToCart({ product_id: p.id, name: p.name, unit: sizeLabel, price: sizePrice }, 1);
@@ -226,7 +229,9 @@ function ShopPage() {
                           const key = p.id + "|" + size.label;
                           const isAdded = added === key;
                           const cartItem = getCart().find((c) => c.product_id === p.id && c.unit === size.label);
-                          const outOfStock = !ordersOpen || (p.stock != null && (cartItem?.quantity ?? 0) >= p.stock);
+                          const cartKg = (cartItem?.quantity ?? 0) * size.multiplier;
+                          const outOfStock = !ordersOpen || (p.stock != null && cartKg >= p.stock);
+                          const remaining = p.stock != null ? Math.max(0, p.stock - cartKg) : null;
                           return (
                             <div
                               key={size.label}
@@ -239,9 +244,9 @@ function ShopPage() {
                                 <span className="ml-2 text-sm text-muted-foreground">
                                   INR {calcPrice}
                                 </span>
-                                {p.stock != null && (
+                                {remaining !== null && (
                                   <span className={`ml-2 text-xs ${outOfStock ? "text-red-500" : "text-green-600"}`}>
-                                    {outOfStock ? "Out" : `${p.stock - (cartItem?.quantity ?? 0)} left`}
+                                    {outOfStock ? "Out" : `${remaining % 1 === 0 ? remaining.toFixed(0) : remaining.toFixed(1)} kg left`}
                                   </span>
                                 )}
                               </div>

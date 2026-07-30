@@ -79,6 +79,14 @@ export const placeOrderWithStockCheck = createServerFn({ method: "POST" })
     }
 
     // 3. Atomically deduct stock for each item (only if stock IS NOT NULL)
+    // Convert order quantity to product's stock unit before deducting
+    const UNIT_TO_KG: Record<string, number> = {
+      "500g": 0.5,
+      "750g": 0.75,
+      "1kg": 1,
+      kg: 1,
+    };
+
     const deducted: { product_id: string; quantity: number }[] = [];
 
     const callRpc = (fn: string, params: Record<string, unknown>) =>
@@ -92,9 +100,22 @@ export const placeOrderWithStockCheck = createServerFn({ method: "POST" })
       ).rpc(fn, params);
 
     for (const item of items) {
+      // Fetch the product's unit to know how to convert quantity
+      const { data: product } = await admin
+        .from("products")
+        .select("unit")
+        .eq("id", item.product_id)
+        .single();
+
+      const productUnit = product?.unit || "kg";
+      const isPiece = productUnit === "piece" || productUnit === "dozen";
+      const convertedQty = isPiece
+        ? item.quantity
+        : item.quantity * (UNIT_TO_KG[item.unit] ?? 1);
+
       const { data: updated, error: sErr } = await callRpc("deduct_product_stock", {
         p_product_id: item.product_id,
-        p_quantity: item.quantity,
+        p_quantity: convertedQty,
       });
 
       if (sErr) {
@@ -125,7 +146,7 @@ export const placeOrderWithStockCheck = createServerFn({ method: "POST" })
         );
       }
 
-      deducted.push({ product_id: item.product_id, quantity: item.quantity });
+      deducted.push({ product_id: item.product_id, quantity: convertedQty });
     }
 
     return { success: true, orderNumber: createdOrder.order_number };
