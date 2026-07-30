@@ -271,48 +271,83 @@ function StatsTab() {
 
   // --- Chart Data ---
 
-  // Daily revenue for last 14 days (Line Chart)
-  const dailyRevenueMap = new Map<string, { revenue: number; orders: number }>();
+  // Daily revenue for last 14 days - split by Mutton / Chicken / Other (Line Chart)
+  const dailyRevenueMap = new Map<string, { mutton: number; chicken: number; other: number; mOrders: number; cOrders: number; oOrders: number }>();
   for (let i = 13; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const key = d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
-    dailyRevenueMap.set(key, { revenue: 0, orders: 0 });
+    dailyRevenueMap.set(key, { mutton: 0, chicken: 0, other: 0, mOrders: 0, cOrders: 0, oOrders: 0 });
   }
   allOrders.forEach((o) => {
     const d = new Date(o.created_at);
     const key = d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
     const entry = dailyRevenueMap.get(key);
-    if (entry) {
-      entry.revenue += Number(o.total);
-      entry.orders += 1;
-    }
+    if (!entry) return;
+    const oItems = items.filter((i) => i.order_id === o.id);
+    let mTotal = 0, cTotal = 0, oTotal = 0;
+    oItems.forEach((it) => {
+      const amt = Number(it.price) * Number(it.quantity);
+      if (it.product_name.toLowerCase().startsWith("mutton")) mTotal += amt;
+      else if (it.product_name.toLowerCase().startsWith("chicken")) cTotal += amt;
+      else oTotal += amt;
+    });
+    if (mTotal > 0) { entry.mutton += mTotal; entry.mOrders += 1; }
+    if (cTotal > 0) { entry.chicken += cTotal; entry.cOrders += 1; }
+    if (oTotal > 0) { entry.other += oTotal; entry.oOrders += 1; }
   });
   const dailyRevenueData = Array.from(dailyRevenueMap.entries()).map(([date, v]) => ({
     date,
-    revenue: Math.round(v.revenue),
-    orders: v.orders,
+    mutton: Math.round(v.mutton),
+    chicken: Math.round(v.chicken),
+    other: Math.round(v.other),
   }));
 
-  // Top selling products (Bar Chart)
-  const productSalesMap = new Map<string, { name: string; qty: number; revenue: number }>();
+  // Top selling products split by Mutton / Chicken (Bar Chart)
+  const muttonProductMap = new Map<string, { name: string; qty: number; revenue: number }>();
+  const chickenProductMap = new Map<string, { name: string; qty: number; revenue: number }>();
   items.forEach((it) => {
-    const existing = productSalesMap.get(it.product_name);
+    const isMutton = it.product_name.toLowerCase().startsWith("mutton");
+    const isChicken = it.product_name.toLowerCase().startsWith("chicken");
+    if (!isMutton && !isChicken) return;
+    const map = isMutton ? muttonProductMap : chickenProductMap;
+    const existing = map.get(it.product_name);
     if (existing) {
       existing.qty += it.quantity;
       existing.revenue += it.price * it.quantity;
     } else {
-      productSalesMap.set(it.product_name, {
-        name: it.product_name,
-        qty: it.quantity,
-        revenue: it.price * it.quantity,
-      });
+      map.set(it.product_name, { name: it.product_name, qty: it.quantity, revenue: it.price * it.quantity });
     }
   });
-  const topProducts = Array.from(productSalesMap.values())
+  const topMuttonProducts = Array.from(muttonProductMap.values())
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 8)
     .map((p) => ({ ...p, revenue: Math.round(p.revenue) }));
+  const topChickenProducts = Array.from(chickenProductMap.values())
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 8)
+    .map((p) => ({ ...p, revenue: Math.round(p.revenue) }));
+
+  // Mutton / Chicken revenue by community
+  const muttonByCommunity = new Map<string, number>();
+  const chickenByCommunity = new Map<string, number>();
+  allOrders.forEach((o) => {
+    const oItems = items.filter((i) => i.order_id === o.id);
+    oItems.forEach((it) => {
+      const amt = Number(it.price) * Number(it.quantity);
+      if (it.product_name.toLowerCase().startsWith("mutton")) {
+        muttonByCommunity.set(o.community_name, (muttonByCommunity.get(o.community_name) || 0) + amt);
+      } else if (it.product_name.toLowerCase().startsWith("chicken")) {
+        chickenByCommunity.set(o.community_name, (chickenByCommunity.get(o.community_name) || 0) + amt);
+      }
+    });
+  });
+  const allCommunityNames = Array.from(new Set([...muttonByCommunity.keys(), ...chickenByCommunity.keys()]));
+  const muttonChickenByCommunity = allCommunityNames.map((name) => ({
+    name,
+    mutton: Math.round(muttonByCommunity.get(name) || 0),
+    chicken: Math.round(chickenByCommunity.get(name) || 0),
+  }));
 
   // Orders by community (Pie Chart)
   const communityPieData = communityStats.map((c) => ({
@@ -407,10 +442,10 @@ function StatsTab() {
         </div>
       </div>
 
-      {/* Line Chart - Daily Revenue */}
+      {/* Line Chart - Daily Revenue by Mutton / Chicken */}
       {dailyRevenueData.length > 0 && (
         <div className="rounded-xl border bg-card p-6">
-          <h3 className="mb-4 text-lg font-semibold">Daily Revenue (Last 14 Days)</h3>
+          <h3 className="mb-4 text-lg font-semibold">Daily Revenue - Mutton vs Chicken (Last 14 Days)</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={dailyRevenueData}>
@@ -421,29 +456,65 @@ function StatsTab() {
                   contentStyle={{ borderRadius: 12, border: "1px solid #e5e7eb" }}
                 />
                 <Legend />
-                <Line type="monotone" dataKey="revenue" stroke="#e11d48" strokeWidth={2} dot={false} name="Revenue" />
-                <Line type="monotone" dataKey="orders" stroke="#2563eb" strokeWidth={2} dot={false} name="Orders" />
+                <Line type="monotone" dataKey="mutton" stroke="#e11d48" strokeWidth={2} dot={false} name="Mutton" />
+                <Line type="monotone" dataKey="chicken" stroke="#f59e0b" strokeWidth={2} dot={false} name="Chicken" />
+                <Line type="monotone" dataKey="other" stroke="#6b7280" strokeWidth={2} dot={false} name="Other" />
               </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
       )}
 
-      {/* Bar Chart - Top Products */}
-      {topProducts.length > 0 && (
+      {/* Bar Charts - Top Products Mutton & Chicken Side by Side */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {topMuttonProducts.length > 0 && (
+          <div className="rounded-xl border bg-card p-6">
+            <h3 className="mb-4 text-lg font-semibold text-red-600">Top Mutton Products</h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={topMuttonProducts} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                  <XAxis type="number" tick={{ fontSize: 11 }} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={110} />
+                  <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #e5e7eb" }} />
+                  <Bar dataKey="revenue" fill="#e11d48" radius={[0, 6, 6, 0]} name="Revenue (INR)" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+        {topChickenProducts.length > 0 && (
+          <div className="rounded-xl border bg-card p-6">
+            <h3 className="mb-4 text-lg font-semibold text-amber-600">Top Chicken Products</h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={topChickenProducts} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                  <XAxis type="number" tick={{ fontSize: 11 }} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={110} />
+                  <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #e5e7eb" }} />
+                  <Bar dataKey="revenue" fill="#f59e0b" radius={[0, 6, 6, 0]} name="Revenue (INR)" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Bar Chart - Mutton vs Chicken by Community */}
+      {muttonChickenByCommunity.length > 0 && (
         <div className="rounded-xl border bg-card p-6">
-          <h3 className="mb-4 text-lg font-semibold">Top Selling Products</h3>
+          <h3 className="mb-4 text-lg font-semibold">Mutton vs Chicken by Community</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topProducts} layout="vertical">
+              <BarChart data={muttonChickenByCommunity}>
                 <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                <XAxis type="number" tick={{ fontSize: 12 }} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={120} />
-                <Tooltip
-                  contentStyle={{ borderRadius: 12, border: "1px solid #e5e7eb" }}
-                />
+                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} />
+                <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #e5e7eb" }} />
                 <Legend />
-                <Bar dataKey="revenue" fill="#e11d48" radius={[0, 6, 6, 0]} name="Revenue" />
+                <Bar dataKey="mutton" fill="#e11d48" radius={[6, 6, 0, 0]} name="Mutton" />
+                <Bar dataKey="chicken" fill="#f59e0b" radius={[6, 6, 0, 0]} name="Chicken" />
               </BarChart>
             </ResponsiveContainer>
           </div>
