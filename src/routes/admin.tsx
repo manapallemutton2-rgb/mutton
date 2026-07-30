@@ -1343,7 +1343,7 @@ function PrintSheet({
                     <tbody>
                       {oItems.map((it) => {
                         const lineAmt = Math.round(Number(it.price) * Number(it.quantity));
-                        const qtyDisplay = it.quantity === 1 ? it.unit : it.quantity + it.unit;
+                        const qtyDisplay = it.unit + " x" + it.quantity;
                         return (
                           <tr key={it.id} className="border-b border-gray-200">
                             <td className="py-0.5">{it.product_name}</td>
@@ -1448,7 +1448,7 @@ function ThermalSheet({
                       <tbody>
                         {oItems.map((it) => {
                           const lineAmt = Math.round(Number(it.price) * Number(it.quantity));
-                          const qtyDisplay = it.quantity === 1 ? it.unit : it.quantity + it.unit;
+                          const qtyDisplay = it.unit + " x" + it.quantity;
                           return (
                             <tr key={it.id}>
                               <td style={{ fontSize: 11, paddingTop: "0.5mm" }}>{it.product_name}</td>

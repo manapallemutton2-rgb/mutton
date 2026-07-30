@@ -280,7 +280,7 @@ export async function printReceipt(receipt: ReceiptData): Promise<boolean> {
   for (const it of receipt.items) {
     const amt = Math.round(Number(it.price) * Number(it.quantity));
     lineTotals.push(amt);
-    const lhs = it.name + " " + it.unit;
+    const lhs = it.name + " " + it.unit + " x" + it.quantity;
     const amtStr = String(amt);
     const pad = W - lhs.length - amtStr.length;
     lines.push(lhs + " ".repeat(Math.max(1, pad)) + amtStr);

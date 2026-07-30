@@ -320,7 +320,7 @@ function CheckoutPage() {
                         <tr key={idx}>
                           <td style={{ fontSize: 11 }}>{it.product_name}</td>
                           <td style={{ textAlign: "center", fontSize: 11 }}>
-                            {it.unit}
+                            {it.unit} x{it.quantity}
                           </td>
                           <td style={{ textAlign: "right", fontSize: 11 }}>
                             INR {lineAmt}
