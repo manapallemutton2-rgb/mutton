@@ -117,6 +117,28 @@ export const adminDeleteBlock = createServerFn({ method: "POST" })
     return { success: true };
   });
 
+export const adminDeleteOrder = createServerFn({ method: "POST" })
+  .validator((data: unknown) => {
+    const d = data as Record<string, unknown>;
+    if (typeof d.id !== "string") throw new Error("Invalid order id");
+    return { id: d.id };
+  })
+  .handler(async ({ data }) => {
+    const admin = await getAdminClient();
+    const { error } = await admin.from("orders").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { success: true };
+  });
+
+export const adminDeleteAllOrders = createServerFn({ method: "POST" })
+  .validator(() => ({}))
+  .handler(async () => {
+    const admin = await getAdminClient();
+    const { error } = await admin.from("orders").delete().neq("id", "");
+    if (error) throw new Error(error.message);
+    return { success: true };
+  });
+
 export const adminRemoveProductImage = createServerFn({ method: "POST" })
   .validator((data: unknown) => {
     const d = data as Record<string, unknown>;

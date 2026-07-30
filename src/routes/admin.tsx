@@ -15,7 +15,23 @@ import {
   Bluetooth,
   ShoppingCart,
   Megaphone,
+  Trash2,
 } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 import { AppHeader } from "@/components/AppHeader";
 import { supabase } from "@/integrations/supabase/client";
 import { getPhone, getRole } from "@/lib/session";
@@ -30,6 +46,8 @@ import {
   adminInsertBlock,
   adminDeleteBlock,
   adminRemoveProductImage,
+  adminDeleteOrder,
+  adminDeleteAllOrders,
 } from "@/lib/admin-operations.server";
 import { adminUploadImage } from "@/lib/upload-image.server";
 
@@ -127,8 +145,23 @@ function unitToKg(unit: string, quantity: number): number {
   if (unit === "500g") return quantity * 0.5;
   if (unit === "750g") return quantity * 0.75;
   if (unit === "kg") return quantity;
+  if (unit === "piece" || unit === "dozen") return 0;
   return quantity;
 }
+
+function unitLabel(unit: string): string {
+  if (unit === "piece") return "pcs";
+  if (unit === "dozen") return "dozen";
+  return "kg";
+}
+
+function unitCount(unit: string, quantity: number): number {
+  if (unit === "piece") return quantity;
+  if (unit === "dozen") return quantity * 12;
+  return 0;
+}
+
+const CHART_COLORS = ["#e11d48", "#2563eb", "#16a34a", "#f59e0b", "#8b5cf6", "#06b6d4", "#f97316", "#ec4899"];
 
 /* ---------------- Stats ---------------- */
 function StatsTab() {
@@ -235,6 +268,71 @@ function StatsTab() {
   const todayOrders = allOrders.filter((o) => new Date(o.created_at).toDateString() === today);
   const todayRevenue = Math.round(todayOrders.reduce((s, o) => s + Number(o.total), 0));
 
+  // --- Chart Data ---
+
+  // Daily revenue for last 14 days (Line Chart)
+  const dailyRevenueMap = new Map<string, { revenue: number; orders: number }>();
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+    dailyRevenueMap.set(key, { revenue: 0, orders: 0 });
+  }
+  allOrders.forEach((o) => {
+    const d = new Date(o.created_at);
+    const key = d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+    const entry = dailyRevenueMap.get(key);
+    if (entry) {
+      entry.revenue += Number(o.total);
+      entry.orders += 1;
+    }
+  });
+  const dailyRevenueData = Array.from(dailyRevenueMap.entries()).map(([date, v]) => ({
+    date,
+    revenue: Math.round(v.revenue),
+    orders: v.orders,
+  }));
+
+  // Top selling products (Bar Chart)
+  const productSalesMap = new Map<string, { name: string; qty: number; revenue: number }>();
+  items.forEach((it) => {
+    const existing = productSalesMap.get(it.product_name);
+    if (existing) {
+      existing.qty += it.quantity;
+      existing.revenue += it.price * it.quantity;
+    } else {
+      productSalesMap.set(it.product_name, {
+        name: it.product_name,
+        qty: it.quantity,
+        revenue: it.price * it.quantity,
+      });
+    }
+  });
+  const topProducts = Array.from(productSalesMap.values())
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 8)
+    .map((p) => ({ ...p, revenue: Math.round(p.revenue) }));
+
+  // Orders by community (Pie Chart)
+  const communityPieData = communityStats.map((c) => ({
+    name: c.name,
+    value: c.revenue,
+  }));
+
+  // Mutton / Chicken sold (handle pieces separately)
+  const muttonKg = items
+    .filter((i) => i.product_name.toLowerCase().startsWith("mutton"))
+    .reduce((s, i) => s + unitToKg(i.unit, i.quantity), 0);
+  const muttonPcs = items
+    .filter((i) => i.product_name.toLowerCase().startsWith("mutton"))
+    .reduce((s, i) => s + unitCount(i.unit, i.quantity), 0);
+  const chickenKg = items
+    .filter((i) => i.product_name.toLowerCase().startsWith("chicken"))
+    .reduce((s, i) => s + unitToKg(i.unit, i.quantity), 0);
+  const chickenPcs = items
+    .filter((i) => i.product_name.toLowerCase().startsWith("chicken"))
+    .reduce((s, i) => s + unitCount(i.unit, i.quantity), 0);
+
   return (
     <div className="space-y-6">
       {/* Overall Summary */}
@@ -272,13 +370,14 @@ function StatsTab() {
             Mutton Sold
           </div>
           <div className="mt-2 text-3xl font-bold text-primary">
-            {(() => {
-              const total = items
-                .filter((i) => i.product_name.toLowerCase().startsWith("mutton"))
-                .reduce((s, i) => s + unitToKg(i.unit, i.quantity), 0);
-              return total % 1 === 0 ? total.toFixed(0) : total.toFixed(2);
-            })()}{" "}
-            <span className="text-lg font-normal text-muted-foreground">kg</span>
+            {muttonKg > 0 && (
+              <>{muttonKg % 1 === 0 ? muttonKg.toFixed(0) : muttonKg.toFixed(2)} <span className="text-lg font-normal text-muted-foreground">kg</span></>
+            )}
+            {muttonKg > 0 && muttonPcs > 0 && <span className="mx-2 text-muted-foreground">/</span>}
+            {muttonPcs > 0 && (
+              <>{muttonPcs} <span className="text-lg font-normal text-muted-foreground">pcs</span></>
+            )}
+            {muttonKg === 0 && muttonPcs === 0 && <span className="text-lg text-muted-foreground">0</span>}
           </div>
         </div>
         <div className="rounded-xl border bg-card p-6">
@@ -286,13 +385,14 @@ function StatsTab() {
             Chicken Sold
           </div>
           <div className="mt-2 text-3xl font-bold text-primary">
-            {(() => {
-              const total = items
-                .filter((i) => i.product_name.toLowerCase().startsWith("chicken"))
-                .reduce((s, i) => s + unitToKg(i.unit, i.quantity), 0);
-              return total % 1 === 0 ? total.toFixed(0) : total.toFixed(2);
-            })()}{" "}
-            <span className="text-lg font-normal text-muted-foreground">kg</span>
+            {chickenKg > 0 && (
+              <>{chickenKg % 1 === 0 ? chickenKg.toFixed(0) : chickenKg.toFixed(2)} <span className="text-lg font-normal text-muted-foreground">kg</span></>
+            )}
+            {chickenKg > 0 && chickenPcs > 0 && <span className="mx-2 text-muted-foreground">/</span>}
+            {chickenPcs > 0 && (
+              <>{chickenPcs} <span className="text-lg font-normal text-muted-foreground">pcs</span></>
+            )}
+            {chickenKg === 0 && chickenPcs === 0 && <span className="text-lg text-muted-foreground">0</span>}
           </div>
         </div>
       </div>
@@ -306,7 +406,102 @@ function StatsTab() {
         </div>
       </div>
 
-      {/* Community Stats */}
+      {/* Line Chart - Daily Revenue */}
+      {dailyRevenueData.length > 0 && (
+        <div className="rounded-xl border bg-card p-6">
+          <h3 className="mb-4 text-lg font-semibold">Daily Revenue (Last 14 Days)</h3>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={dailyRevenueData}>
+                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} />
+                <Tooltip
+                  contentStyle={{ borderRadius: 12, border: "1px solid #e5e7eb" }}
+                />
+                <Legend />
+                <Line type="monotone" dataKey="revenue" stroke="#e11d48" strokeWidth={2} dot={false} name="Revenue" />
+                <Line type="monotone" dataKey="orders" stroke="#2563eb" strokeWidth={2} dot={false} name="Orders" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {/* Bar Chart - Top Products */}
+      {topProducts.length > 0 && (
+        <div className="rounded-xl border bg-card p-6">
+          <h3 className="mb-4 text-lg font-semibold">Top Selling Products</h3>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={topProducts} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                <XAxis type="number" tick={{ fontSize: 12 }} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={120} />
+                <Tooltip
+                  contentStyle={{ borderRadius: 12, border: "1px solid #e5e7eb" }}
+                />
+                <Legend />
+                <Bar dataKey="revenue" fill="#e11d48" radius={[0, 6, 6, 0]} name="Revenue" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {/* Pie Chart - Revenue by Community */}
+      {communityPieData.length > 0 && (
+        <div className="rounded-xl border bg-card p-6">
+          <h3 className="mb-4 text-lg font-semibold">Revenue by Community</h3>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={communityPieData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={110}
+                  paddingAngle={3}
+                  dataKey="value"
+                  label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                >
+                  {communityPieData.map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{ borderRadius: 12, border: "1px solid #e5e7eb" }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {/* Bar Chart - Revenue by Community */}
+      {communityStats.length > 0 && (
+        <div className="rounded-xl border bg-card p-6">
+          <h3 className="mb-4 text-lg font-semibold">Community Comparison</h3>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={communityStats}>
+                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} />
+                <Tooltip
+                  contentStyle={{ borderRadius: 12, border: "1px solid #e5e7eb" }}
+                />
+                <Legend />
+                <Bar dataKey="revenue" fill="#e11d48" radius={[6, 6, 0, 0]} name="Revenue" />
+                <Bar dataKey="orders" fill="#2563eb" radius={[6, 6, 0, 0]} name="Orders" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {/* Community Stats Table */}
       <div className="rounded-xl border bg-card p-6">
         <h3 className="mb-4 text-lg font-semibold">By Community</h3>
         {communityStats.length === 0 ? (
@@ -635,6 +830,36 @@ function OrdersTab() {
     [items],
   );
 
+  const deleteOrderMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      await adminDeleteOrder({ data: { id: orderId } });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "order_items"] });
+    },
+  });
+
+  const deleteAllOrdersMutation = useMutation({
+    mutationFn: async () => {
+      await adminDeleteAllOrders({ data: {} });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "order_items"] });
+    },
+  });
+
+  const handleDeleteOrder = (orderId: string, orderNumber: string) => {
+    if (!confirm(`Delete order ${orderNumber}? This cannot be undone.`)) return;
+    deleteOrderMutation.mutate(orderId);
+  };
+
+  const handleDeleteAllOrders = () => {
+    if (!confirm(`Delete ALL ${allOrders.length} orders? This cannot be undone.`)) return;
+    deleteAllOrdersMutation.mutate();
+  };
+
   if (isLoading)
     return (
       <div className="space-y-3">
@@ -881,6 +1106,16 @@ function OrdersTab() {
           <h3 className="text-sm font-semibold text-muted-foreground">
             All recent orders ({allOrders.length} total)
           </h3>
+          {allOrders.length > 0 && (
+            <button
+              onClick={handleDeleteAllOrders}
+              disabled={deleteAllOrdersMutation.isPending}
+              className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+            >
+              <Trash2 className="h-4 w-4" />
+              {deleteAllOrdersMutation.isPending ? "Deleting..." : "Delete All"}
+            </button>
+          )}
           {totalPages > 1 && (
             <div className="flex items-center gap-2 text-sm">
               <button
@@ -931,6 +1166,13 @@ function OrdersTab() {
                     className="flex items-center gap-1.5 rounded-lg bg-secondary px-3 py-2 text-sm"
                   >
                     <Receipt className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteOrder(o.id, o.order_number)}
+                    disabled={deleteOrderMutation.isPending}
+                    className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-sm text-white hover:bg-red-700 disabled:opacity-50"
+                  >
+                    <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
               </div>
@@ -1008,6 +1250,13 @@ function OrdersTab() {
                         className="flex items-center gap-1.5 rounded-lg bg-secondary px-3 py-2 text-sm"
                       >
                         <Receipt className="h-4 w-4" /> Thermal
+                      </button>
+                      <button
+                        onClick={() => handleDeleteOrder(o.id, o.order_number)}
+                        disabled={deleteOrderMutation.isPending}
+                        className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-sm text-white hover:bg-red-700 disabled:opacity-50"
+                      >
+                        <Trash2 className="h-4 w-4" /> Delete
                       </button>
                     </div>
                   </td>
