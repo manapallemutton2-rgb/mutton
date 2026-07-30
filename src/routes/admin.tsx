@@ -16,6 +16,7 @@ import {
   ShoppingCart,
   Megaphone,
   Trash2,
+  Download,
 } from "lucide-react";
 import {
   BarChart,
@@ -860,6 +861,41 @@ function OrdersTab() {
     deleteAllOrdersMutation.mutate();
   };
 
+  const downloadOrdersCSV = () => {
+    const rows: string[] = [];
+    rows.push("Order ID,Date,Customer Name,Flat,Phone,Alt Phone,Community,Block,Packing Note,Items,Total");
+    for (const o of allOrders) {
+      const oItems = items.filter((i) => i.order_id === o.id);
+      const itemsStr = oItems
+        .map((it) => `${it.product_name} ${it.unit} x${it.quantity} INR${Math.round(Number(it.price) * Number(it.quantity))}`)
+        .join(" | ");
+      const date = new Date(o.created_at).toLocaleString();
+      const escape = (s: string) => `"${(s || "").replace(/"/g, '""')}"`;
+      rows.push(
+        [
+          o.order_number,
+          escape(date),
+          escape(o.customer_name),
+          escape(o.flat_no),
+          o.phone,
+          o.alt_phone || "",
+          escape(o.community_name),
+          escape(o.block_name),
+          escape(o.packing_note || ""),
+          escape(itemsStr),
+          Math.round(Number(o.total)),
+        ].join(","),
+      );
+    }
+    const blob = new Blob(["\uFEFF" + rows.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `orders_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   if (isLoading)
     return (
       <div className="space-y-3">
@@ -1107,14 +1143,22 @@ function OrdersTab() {
             All recent orders ({allOrders.length} total)
           </h3>
           {allOrders.length > 0 && (
-            <button
-              onClick={handleDeleteAllOrders}
-              disabled={deleteAllOrdersMutation.isPending}
-              className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
-            >
-              <Trash2 className="h-4 w-4" />
-              {deleteAllOrdersMutation.isPending ? "Deleting..." : "Delete All"}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={downloadOrdersCSV}
+                className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                <Download className="h-4 w-4" /> Download CSV
+              </button>
+              <button
+                onClick={handleDeleteAllOrders}
+                disabled={deleteAllOrdersMutation.isPending}
+                className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                <Trash2 className="h-4 w-4" />
+                {deleteAllOrdersMutation.isPending ? "Deleting..." : "Delete All"}
+              </button>
+            </div>
           )}
           {totalPages > 1 && (
             <div className="flex items-center gap-2 text-sm">
