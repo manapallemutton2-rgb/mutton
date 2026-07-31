@@ -19,6 +19,7 @@ import {
   Download,
   Package,
   ArrowUpDown,
+  Calendar,
 } from "lucide-react";
 import {
   BarChart,
@@ -658,7 +659,6 @@ function StatsTab() {
 }
 
 /* ---------------- Item Sales ---------------- */
-type DateFilter = "all" | "today" | "7days" | "30days";
 type CategoryFilter = "all" | "mutton" | "chicken" | "other";
 
 type ItemStat = { name: string; unit: string; qty: number; kgSold: number; pcsSold: number; revenue: number; orderCount: number; currentStock: number | null };
@@ -670,8 +670,77 @@ function categorizeProduct(name: string): "mutton" | "chicken" | "other" {
   return "other";
 }
 
+function todayDateString(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function formatDDMMYYYY(yyyymmdd: string): string {
+  if (!yyyymmdd) return "DD/MM/YYYY";
+  const parts = yyyymmdd.split("-");
+  if (parts.length !== 3) return "DD/MM/YYYY";
+  const [y, m, d] = parts;
+  return `${d}/${m}/${y}`;
+}
+
+function DateCalendarPicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const openPicker = () => {
+    const el = inputRef.current;
+    if (!el) return;
+    // Open the native calendar directly (supported in all modern browsers)
+    if (typeof el.showPicker === "function") {
+      try {
+        el.showPicker();
+        return;
+      } catch {
+        // ignore and fall back to focusing the input
+      }
+    }
+    el.focus();
+  };
+
+  return (
+    <div
+      onClick={openPicker}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          openPicker();
+        }
+      }}
+      className="relative flex cursor-pointer select-none items-center gap-3 rounded-2xl border-2 border-primary/50 bg-card px-5 py-3 shadow-sm transition hover:border-primary"
+    >
+      <Calendar className="h-6 w-6 text-primary" />
+      <span className="text-lg font-bold text-foreground">
+        {value ? formatDDMMYYYY(value) : "DD/MM/YYYY"}
+      </span>
+      <input
+        ref={inputRef}
+        type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="sr-only"
+        aria-label="Select date"
+      />
+    </div>
+  );
+}
+
 function ItemSalesTab() {
-  const [dateFilter, setDateFilter] = useState<DateFilter>("all");
+  const [selectedDate, setSelectedDate] = useState<string>(todayDateString());
   const [category, setCategory] = useState<CategoryFilter>("all");
   const [sortBy, setSortBy] = useState<"revenue" | "quantity">("revenue");
 
@@ -723,23 +792,15 @@ function ItemSalesTab() {
       </div>
     );
 
-  // Filter orders by date
-  const now = new Date();
+  // Filter orders by selected date
   const filteredOrderIds = new Set(
     orders
       .filter((o) => {
-        if (dateFilter === "all") return true;
+        if (!selectedDate) return true;
         const d = new Date(o.created_at);
-        if (dateFilter === "today") return d.toDateString() === now.toDateString();
-        if (dateFilter === "7days") {
-          const diff = (now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24);
-          return diff <= 7;
-        }
-        if (dateFilter === "30days") {
-          const diff = (now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24);
-          return diff <= 30;
-        }
-        return true;
+        const [y, m, dd] = selectedDate.split("-").map(Number);
+        const sel = new Date(y, m - 1, dd);
+        return d.toDateString() === sel.toDateString();
       })
       .map((o) => o.id)
   );
@@ -883,21 +944,7 @@ function ItemSalesTab() {
     <div className="space-y-6">
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex gap-1 rounded-xl border bg-card p-1">
-          {(["all", "today", "7days", "30days"] as DateFilter[]).map((f) => (
-            <button
-              key={f}
-              onClick={() => setDateFilter(f)}
-              className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-                dateFilter === f
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {f === "all" ? "All Time" : f === "today" ? "Today" : f === "7days" ? "Last 7 Days" : "Last 30 Days"}
-            </button>
-          ))}
-        </div>
+        <DateCalendarPicker value={selectedDate} onChange={setSelectedDate} />
         <div className="flex gap-1 rounded-xl border bg-card p-1">
           {([
             { value: "all" as CategoryFilter, label: "All" },
@@ -1077,6 +1124,7 @@ function OrdersTab() {
   const [printMode, setPrintMode] = useState<PrintMode>("a4");
   const [printScope, setPrintScope] = useState<PrintScope>(null);
   const [page, setPage] = useState(0);
+  const [selectedDate, setSelectedDate] = useState<string>(todayDateString());
   const [newOrderAlert, setNewOrderAlert] = useState<Order | null>(null);
   const { data: settings = {} } = useQuery<Record<string, string>>({
     queryKey: ["admin", "orders-settings"],
@@ -1396,8 +1444,18 @@ function OrdersTab() {
     : [];
   const blocks = Array.from(new Set(communityOrders.map((o) => o.block_name))).sort();
 
-  const totalPages = Math.ceil(allOrders.length / ORDERS_PER_PAGE);
-  const paginatedOrders = allOrders.slice(page * ORDERS_PER_PAGE, (page + 1) * ORDERS_PER_PAGE);
+  const dateFilteredOrders = selectedDate
+    ? allOrders.filter((o) => {
+        const d = new Date(o.created_at);
+        const [y, m, dd] = selectedDate.split("-").map(Number);
+        const sel = new Date(y, m - 1, dd);
+        return d.toDateString() === sel.toDateString();
+      })
+    : allOrders;
+
+  const totalPages = Math.ceil(dateFilteredOrders.length / ORDERS_PER_PAGE);
+  const currentPage = Math.min(page, Math.max(0, totalPages - 1));
+  const paginatedOrders = dateFilteredOrders.slice(currentPage * ORDERS_PER_PAGE, (currentPage + 1) * ORDERS_PER_PAGE);
 
   let printOrders: Order[] = [];
   let printTitle = "";
@@ -1620,9 +1678,18 @@ function OrdersTab() {
       </div>
 
       <div className="no-print mt-8">
+        <div className="mb-4">
+          <DateCalendarPicker
+            value={selectedDate}
+            onChange={(v) => {
+              setSelectedDate(v);
+              setPage(0);
+            }}
+          />
+        </div>
         <div className="no-print mb-4 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-muted-foreground">
-            All recent orders ({allOrders.length} total)
+            Orders for {formatDDMMYYYY(selectedDate)} ({dateFilteredOrders.length})
           </h3>
           {allOrders.length > 0 && (
             <div className="flex items-center gap-2">
@@ -1646,17 +1713,17 @@ function OrdersTab() {
             <div className="flex items-center gap-2 text-sm">
               <button
                 onClick={() => setPage((p) => Math.max(0, p - 1))}
-                disabled={page === 0}
+                disabled={currentPage === 0}
                 className="rounded border px-2 py-1 text-xs disabled:opacity-50"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <span className="text-xs text-muted-foreground">
-                Page {page + 1} of {totalPages}
+                Page {currentPage + 1} of {totalPages}
               </span>
               <button
                 onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                disabled={page >= totalPages - 1}
+                disabled={currentPage >= totalPages - 1}
                 className="rounded border px-2 py-1 text-xs disabled:opacity-50"
               >
                 <ChevronRight className="h-4 w-4" />
@@ -1723,9 +1790,9 @@ function OrdersTab() {
               </div>
             </div>
           ))}
-          {allOrders.length === 0 && (
+          {dateFilteredOrders.length === 0 && (
             <div className="rounded-lg border bg-card p-4 text-center text-muted-foreground">
-              No orders yet
+              No orders for {formatDDMMYYYY(selectedDate)}
             </div>
           )}
         </div>
@@ -1788,10 +1855,10 @@ function OrdersTab() {
                   </td>
                 </tr>
               ))}
-              {allOrders.length === 0 && (
+              {dateFilteredOrders.length === 0 && (
                 <tr>
                   <td colSpan={10} className="p-5 text-center text-muted-foreground text-base">
-                    No orders yet
+                    No orders for {formatDDMMYYYY(selectedDate)}
                   </td>
                 </tr>
               )}
