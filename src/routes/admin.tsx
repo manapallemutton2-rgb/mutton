@@ -695,45 +695,39 @@ function DateCalendarPicker({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const openPicker = () => {
+  const openPicker = (e: React.MouseEvent<HTMLInputElement>) => {
+    // Try the programmatic opener first (best coverage in Chrome/Edge/Firefox).
     const el = inputRef.current;
-    if (!el) return;
-    // Open the native calendar directly (supported in all modern browsers)
-    if (typeof el.showPicker === "function") {
+    if (el && typeof el.showPicker === "function") {
       try {
         el.showPicker();
         return;
       } catch {
-        // ignore and fall back to focusing the input
+        // Ignore; fall back to the input's native click-to-open below.
       }
     }
-    el.focus();
+    // Last resort: ensure the input is focused; a visible date input opens its
+    // native picker on click in every browser (incl. Safari).
+    e.currentTarget.focus();
   };
 
   return (
-    <div
-      onClick={openPicker}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          openPicker();
-        }
-      }}
-      className="relative flex cursor-pointer select-none items-center gap-3 rounded-2xl border-2 border-primary/50 bg-card px-5 py-3 shadow-sm transition hover:border-primary"
-    >
-      <Calendar className="h-6 w-6 text-primary" />
-      <span className="text-lg font-bold text-foreground">
+    <div className="relative flex cursor-pointer select-none items-center gap-3 rounded-2xl border-2 border-primary/50 bg-card px-5 py-3 shadow-sm transition hover:border-primary">
+      <span className="pointer-events-none flex items-center gap-3 text-lg font-bold text-foreground">
+        <Calendar className="h-6 w-6 text-primary" />
         {value ? formatDDMMYYYY(value) : "DD/MM/YYYY"}
       </span>
+      {/* Visible native date input layered on top. Its text is transparent so our
+          DD/MM/YYYY label shows through, but it stays clickable so the native
+          picker opens reliably in every browser (incl. Safari). */}
       <input
         ref={inputRef}
         type="date"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="sr-only"
+        onClick={openPicker}
         aria-label="Select date"
+        className="absolute inset-0 z-10 h-full w-full cursor-pointer appearance-none bg-transparent text-transparent caret-transparent outline-none [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0"
       />
     </div>
   );
