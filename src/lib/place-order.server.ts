@@ -108,7 +108,7 @@ export const placeOrderWithStockCheck = createServerFn({ method: "POST" })
         .single();
 
       const productUnit = product?.unit || "kg";
-      const isPiece = productUnit === "piece" || productUnit === "dozen";
+      const isPiece = productUnit === "piece" || productUnit === "dozen" || productUnit === "tray";
       const convertedQty = isPiece
         ? item.quantity
         : item.quantity * (UNIT_TO_KG[item.unit] ?? 1);

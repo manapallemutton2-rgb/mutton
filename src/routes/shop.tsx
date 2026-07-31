@@ -277,33 +277,49 @@ function ShopPage() {
                       </div>
                     ) : (
                       <div className="mt-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-sm text-muted-foreground">per {p.unit}</p>
-                            <span className="text-xl font-bold text-primary sm:text-2xl">
-                              INR {Number(p.price).toFixed(0)}
-                            </span>
-                          </div>
-                          <button
-                            onClick={() => add(p, p.unit, Number(p.price))}
-                            disabled={!ordersOpen}
-                            className={`flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition sm:px-6 sm:py-3.5 sm:text-base ${
-                              added === p.id + "|" + p.unit
-                                ? "bg-green-600 text-white"
-                                : !ordersOpen
-                                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                                  : "bg-primary text-primary-foreground hover:opacity-90 active:scale-[0.98]"
-                            }`}
-                          >
-                            {added === p.id + "|" + p.unit ? (
-                              <><Check className="h-4 w-4 sm:h-5 sm:w-5" /> Added</>
-                            ) : !ordersOpen ? (
-                              "Orders Closed"
-                            ) : (
-                              <><Plus className="h-4 w-4 sm:h-5 sm:w-5" /> Add to Cart</>
-                            )}
-                          </button>
-                        </div>
+                        {(() => {
+                          const cartItem = getCart().find((c) => c.product_id === p.id && c.unit === p.unit);
+                          const cartQty = cartItem?.quantity ?? 0;
+                          const outOfStock = !ordersOpen || (p.stock != null && cartQty >= p.stock);
+                          const remaining = p.stock != null ? Math.max(0, p.stock - cartQty) : null;
+                          const unitDisplay = p.unit === "tray" ? "Tray (30)" : p.unit === "dozen" ? "Dozen (12)" : p.unit;
+                          return (
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <p className="text-sm text-muted-foreground">per {unitDisplay}</p>
+                                <span className="text-xl font-bold text-primary sm:text-2xl">
+                                  INR {Number(p.price).toFixed(0)}
+                                </span>
+                                {remaining !== null && (
+                                  <span className={`ml-2 text-xs ${outOfStock ? "text-red-500" : "text-green-600"}`}>
+                                    {outOfStock ? "Out of stock" : `${remaining} ${p.unit === "tray" ? "tray" : p.unit === "dozen" ? "dozen" : "pcs"} left`}
+                                  </span>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => add(p, p.unit, Number(p.price))}
+                                disabled={!ordersOpen || outOfStock}
+                                className={`flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition sm:px-6 sm:py-3.5 sm:text-base ${
+                                  added === p.id + "|" + p.unit
+                                    ? "bg-green-600 text-white"
+                                    : !ordersOpen || outOfStock
+                                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                      : "bg-primary text-primary-foreground hover:opacity-90 active:scale-[0.98]"
+                                }`}
+                              >
+                                {added === p.id + "|" + p.unit ? (
+                                  <><Check className="h-4 w-4 sm:h-5 sm:w-5" /> Added</>
+                                ) : !ordersOpen ? (
+                                  "Orders Closed"
+                                ) : outOfStock ? (
+                                  "Out of Stock"
+                                ) : (
+                                  <><Plus className="h-4 w-4 sm:h-5 sm:w-5" /> Add to Cart</>
+                                )}
+                              </button>
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
                   </div>

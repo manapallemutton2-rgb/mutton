@@ -16,6 +16,7 @@ const UNIT_TO_KG: Record<string, number> = {
 };
 
 export function unitToKg(unit: string, quantity: number): number {
+  if (unit === "piece" || unit === "dozen" || unit === "tray") return quantity;
   const kg = UNIT_TO_KG[unit];
   return kg != null ? kg * quantity : quantity;
 }

@@ -118,12 +118,12 @@ export function AppHeader({ title }: { title?: string }) {
             alt="Logo"
             className="h-9 w-9 rounded-xl object-contain shadow-sm sm:h-10 sm:w-10"
           />
-          <div className="truncate">
-            <span>
+          <div className="min-w-0 truncate">
+            <span className="text-sm sm:text-xl">
               Manapalle
-              <span className="text-base font-normal opacity-70"> Mutton & Chicken</span>
+              <span className="hidden sm:inline text-base font-normal opacity-70"> Mutton & Chicken</span>
             </span>
-            <div className="text-[11px] leading-tight text-muted-foreground">
+            <div className="hidden text-[11px] leading-tight text-muted-foreground sm:block">
               Fresh from the Village, Straight to Your Home — 9030901233
             </div>
           </div>
@@ -257,14 +257,14 @@ export function AppHeader({ title }: { title?: string }) {
                 <Link to="/admin" onClick={() => setMenuOpen(false)} className="py-2 font-medium">
                   Admin Panel
                 </Link>
+                <button
+                  onClick={logout}
+                  className="flex items-center gap-2 py-2 text-left text-muted-foreground hover:text-foreground font-medium"
+                >
+                  <LogOut className="h-4 w-4" /> Logout
+                </button>
               </>
             )}
-            <button
-              onClick={logout}
-              className="flex items-center gap-2 py-2 text-left text-muted-foreground hover:text-foreground font-medium"
-            >
-              <LogOut className="h-4 w-4" /> Logout
-            </button>
           </div>
         </div>
       )}
