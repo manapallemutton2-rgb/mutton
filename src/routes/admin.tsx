@@ -1363,6 +1363,9 @@ function OrdersTab() {
       queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
       queryClient.invalidateQueries({ queryKey: ["admin", "order_items"] });
     },
+    onError: (err: Error) => {
+      alert(`Failed to delete order: ${err.message}`);
+    },
   });
 
   const deleteAllOrdersMutation = useMutation({
@@ -1372,6 +1375,9 @@ function OrdersTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
       queryClient.invalidateQueries({ queryKey: ["admin", "order_items"] });
+    },
+    onError: (err: Error) => {
+      alert(`Failed to delete orders: ${err.message}`);
     },
   });
 

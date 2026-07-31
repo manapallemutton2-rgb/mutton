@@ -134,7 +134,16 @@ export const adminDeleteAllOrders = createServerFn({ method: "POST" })
   .validator(() => ({}))
   .handler(async () => {
     const admin = await getAdminClient();
-    const { error } = await admin.from("orders").delete().neq("id", "");
+
+    // Delete order items first so this works even if the hosted DB's
+    // foreign key from order_items -> orders lacks ON DELETE CASCADE.
+    const { error: itemsError } = await admin.from("order_items").delete().not("id", "is", null);
+    if (itemsError) throw new Error(itemsError.message);
+
+    // Delete all orders. Use `not("id", "is", null)` (id IS NOT NULL) rather
+    // than `neq("id", "")` — comparing a uuid column to an empty string makes
+    // Postgres raise "invalid input syntax for type uuid", so nothing gets deleted.
+    const { error } = await admin.from("orders").delete().not("id", "is", null);
     if (error) throw new Error(error.message);
     return { success: true };
   });
