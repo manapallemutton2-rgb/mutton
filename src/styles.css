@@ -1,0 +1,282 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 6px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
+:root {
+  --radius: 0.75rem;
+  --background: oklch(0.94 0.03 80);
+  --foreground: oklch(0.2 0.03 50);
+  --card: oklch(0.99 0.01 90);
+  --card-foreground: oklch(0.2 0.03 50);
+  --primary: oklch(0.40 0.10 155);
+  --primary-foreground: oklch(0.98 0.01 90);
+  --secondary: oklch(0.86 0.06 135);
+  --secondary-foreground: oklch(0.40 0.10 155);
+  --muted: oklch(0.86 0.04 85);
+  --muted-foreground: oklch(0.35 0.04 60);
+  --accent: oklch(0.90 0.04 30);
+  --accent-foreground: oklch(0.2 0.03 50);
+  --destructive: oklch(0.55 0.20 15);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(0.82 0.03 85);
+  --input: oklch(0.82 0.03 85);
+  --ring: oklch(0.40 0.10 155);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  html {
+    font-size: 18px;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family:
+      system-ui,
+      -apple-system,
+      sans-serif;
+    line-height: 1.6;
+  }
+  input,
+  select,
+  textarea,
+  button {
+    font-size: inherit;
+    font-family: inherit;
+  }
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out both;
+}
+.animate-slide-up {
+  animation: slideUp 0.4s ease-out both;
+}
+.animate-scale-in {
+  animation: scaleIn 0.25s ease-out both;
+}
+.stagger-1 {
+  animation-delay: 0.05s;
+}
+.stagger-2 {
+  animation-delay: 0.1s;
+}
+.stagger-3 {
+  animation-delay: 0.15s;
+}
+.stagger-4 {
+  animation-delay: 0.2s;
+}
+.stagger-5 {
+  animation-delay: 0.25s;
+}
+.stagger-6 {
+  animation-delay: 0.3s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .print-page {
+    page-break-after: always;
+  }
+  body {
+    background: white;
+  }
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+/* Thermal 80mm printing */
+@media print {
+  .thermal-only {
+    display: none;
+  }
+}
+.printing-thermal .no-print {
+  display: none !important;
+}
+.printing-thermal .screen-only {
+  display: none !important;
+}
+@media print {
+  .printing-thermal .thermal-only {
+    display: block;
+  }
+  .printing-thermal .a4-only {
+    display: none !important;
+  }
+}
+@page thermal {
+  size: 80mm auto;
+  margin: 2mm;
+}
+.printing-thermal {
+  page: thermal;
+}
+.thermal-receipt {
+  width: 72mm;
+  font-family: "Courier New", monospace;
+  font-size: 12px;
+  font-weight: 500;
+  color: #000;
+  background: #fff;
+  padding: 2mm;
+  line-height: 1.4;
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+}
+.thermal-receipt img {
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+}
+.thermal-receipt h1 {
+  font-size: 16px;
+  font-weight: 800;
+  text-align: center;
+  margin: 0 0 2mm;
+  letter-spacing: 1px;
+}
+.thermal-receipt table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.thermal-receipt .row {
+  display: flex;
+  justify-content: space-between;
+}
+.thermal-receipt .divider {
+  border-top: 1px dashed #000;
+  margin: 2mm 0;
+}
+.thermal-receipt .divider-solid {
+  border-top: 2px solid #000;
+  margin: 2mm 0;
+}
+.thermal-page {
+  page-break-after: always;
+  break-after: page;
+}
+.thermal-page:last-child {
+  page-break-after: auto;
+  break-after: auto;
+}
+.thermal-order {
+  page-break-inside: avoid;
+}
+@page {
+  size: A4;
+  margin: 10mm;
+}
+
+.print-page {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #000;
+}
+.print-page table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.print-page table th {
+  padding: 4px 6px;
+  text-align: left;
+  font-size: 11px;
+}
+.print-page table td {
+  padding: 3px 6px;
+  font-size: 12px;
+}
+.print-page h1 {
+  font-size: 22px;
+  font-weight: 800;
+}
+.print-page h2 {
+  font-size: 15px;
+  font-weight: 700;
+}
+.print-page .avoid-break {
+  page-break-inside: avoid;
+}
