@@ -24,10 +24,10 @@ const SIZE_OPTIONS = [
   { label: "1kg", multiplier: 1 },
 ];
 
-const CATEGORY_META: Record<string, { label: string; color: string; bg: string }> = {
-  mutton: { label: "Mutton", color: "#C94F5C", bg: "#FDE8E8" },
-  chicken: { label: "Chicken", color: "#D97706", bg: "#FEF3C7" },
-  fish: { label: "Fish", color: "#0284C7", bg: "#E0F2FE" },
+const CATEGORY_META: Record<string, { label: string; color: string; bg: string; image?: string }> = {
+  mutton: { label: "Mutton", color: "#C94F5C", bg: "#FDE8E8", image: "/mutton.avif" },
+  chicken: { label: "Chicken", color: "#D97706", bg: "#FEF3C7", image: "/chicken.webp" },
+  fish: { label: "Fish", color: "#0284C7", bg: "#E0F2FE", image: "/fish.jpg" },
   prawns: { label: "Prawns", color: "#EA580C", bg: "#FFF7ED" },
   eggs: { label: "Eggs", color: "#7C3AED", bg: "#F5F3FF" },
   other: { label: "Other", color: "#6B7280", bg: "#F3F4F6" },
@@ -212,10 +212,16 @@ function CategoryPage() {
         {/* CATEGORY TITLE */}
         <div className="mb-4 flex items-center gap-2">
           <div
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-sm font-bold text-white"
-            style={{ backgroundColor: catMeta.color }}
+            className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg"
+            style={{ backgroundColor: catMeta.bg }}
           >
-            {catMeta.label.charAt(0)}
+            {catMeta.image ? (
+              <img src={catMeta.image} alt={catMeta.label} className="h-full w-full object-cover" />
+            ) : (
+              <span className="text-sm font-bold text-white" style={{ backgroundColor: catMeta.color, width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {catMeta.label.charAt(0)}
+              </span>
+            )}
           </div>
           <h1 className="text-xl font-bold" style={{ color: catMeta.color }}>
             {catMeta.label}

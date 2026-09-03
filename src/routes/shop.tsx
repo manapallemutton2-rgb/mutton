@@ -16,10 +16,10 @@ type Product = {
   stock?: number | null;
 };
 
-const CATEGORY_META: Record<string, { label: string; color: string; bg: string }> = {
-  mutton: { label: "Mutton", color: "#C94F5C", bg: "#FDE8E8" },
-  chicken: { label: "Chicken", color: "#D97706", bg: "#FEF3C7" },
-  fish: { label: "Fish", color: "#0284C7", bg: "#E0F2FE" },
+const CATEGORY_META: Record<string, { label: string; color: string; bg: string; image?: string }> = {
+  mutton: { label: "Mutton", color: "#C94F5C", bg: "#FDE8E8", image: "/mutton.avif" },
+  chicken: { label: "Chicken", color: "#D97706", bg: "#FEF3C7", image: "/chicken.webp" },
+  fish: { label: "Fish", color: "#0284C7", bg: "#E0F2FE", image: "/fish.jpg" },
   prawns: { label: "Prawns", color: "#EA580C", bg: "#FFF7ED" },
   eggs: { label: "Eggs", color: "#7C3AED", bg: "#F5F3FF" },
   other: { label: "Other", color: "#6B7280", bg: "#F3F4F6" },
@@ -154,16 +154,16 @@ function ShopPage() {
 
         {/* TRUST STRIP */}
         <section className="relative z-10 mx-auto max-w-5xl px-4 pb-4 sm:px-6">
-          <div className="grid grid-cols-2 gap-1.5 rounded-xl bg-card p-1.5 shadow sm:flex sm:gap-3 sm:p-3">
+          <div className="grid grid-cols-2 gap-2 rounded-xl bg-card p-2 shadow sm:flex sm:gap-3 sm:p-3">
             {[
-              { title: "100% Natural", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 sm:h-5 sm:w-5"><path d="M17 8C8 10 5.9 16.17 3.82 21.34l1.89.66L7 18"/><path d="M17 8c2-1 4 0 4 0s1 2 0 4"/><path d="M17 8A8 8 0 003.5 17.5"/></svg> },
-              { title: "Tender & Juicy", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 sm:h-5 sm:w-5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg> },
-              { title: "Hygienically Packed", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 sm:h-5 sm:w-5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> },
-              { title: "Delivered Fresh", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 sm:h-5 sm:w-5"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg> },
+              { title: "100% Natural", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 shrink-0 sm:h-6 sm:w-6"><path d="M17 8C8 10 5.9 16.17 3.82 21.34l1.89.66L7 18"/><path d="M17 8c2-1 4 0 4 0s1 2 0 4"/><path d="M17 8A8 8 0 003.5 17.5"/></svg> },
+              { title: "Tender & Juicy", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 shrink-0 sm:h-6 sm:w-6"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg> },
+              { title: "Hygienically Packed", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 shrink-0 sm:h-6 sm:w-6"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> },
+              { title: "Delivered Fresh", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 shrink-0 sm:h-6 sm:w-6"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg> },
             ].map((item) => (
-              <div key={item.title} className="flex items-center justify-center gap-1.5 rounded-lg bg-muted/50 px-2 py-2 sm:flex-1 sm:px-3 sm:py-2">
+              <div key={item.title} className="flex items-center justify-center gap-2 rounded-lg bg-muted/50 px-3 py-2.5 sm:flex-1 sm:px-4 sm:py-3">
                 <span className="text-primary">{item.icon}</span>
-                <span className="whitespace-nowrap text-[10px] font-bold text-primary sm:text-xs">{item.title}</span>
+                <span className="whitespace-nowrap text-xs font-bold text-primary sm:text-sm">{item.title}</span>
               </div>
             ))}
           </div>
@@ -174,14 +174,14 @@ function ShopPage() {
           <h2 className="mb-3 text-lg font-bold text-foreground sm:text-xl">Choose a Category</h2>
 
           {isLoading ? (
-            <div className="flex gap-3 overflow-hidden">
+            <div className="flex gap-4 overflow-hidden">
               {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="h-28 w-28 shrink-0 animate-pulse rounded-xl bg-muted sm:h-32 sm:w-32" />
+                <div key={i} className="h-52 w-48 shrink-0 animate-pulse rounded-2xl bg-muted sm:h-56 sm:w-52" />
               ))}
             </div>
           ) : (
             <div
-              className="flex gap-3 overflow-x-auto pb-2"
+              className="flex gap-4 overflow-x-auto pb-2"
               style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}
             >
               {categories.map((cat) => {
@@ -191,21 +191,27 @@ function ShopPage() {
                   <button
                     key={cat}
                     onClick={() => navigate({ to: "/shop/$category", params: { category: cat } })}
-                    className="group flex w-28 shrink-0 flex-col items-center overflow-hidden rounded-xl border bg-card shadow-sm transition hover:shadow-md active:scale-[0.97] sm:w-32"
+                    className="group flex w-48 shrink-0 flex-col overflow-hidden rounded-2xl border bg-card shadow-sm transition hover:shadow-lg active:scale-[0.97] sm:w-52"
                   >
-                    <div
-                      className="flex h-16 w-full items-center justify-center transition group-hover:scale-105 sm:h-20"
-                      style={{ backgroundColor: meta.bg }}
-                    >
-                      <span className="text-2xl font-extrabold sm:text-3xl" style={{ color: meta.color }}>
-                        {meta.label.charAt(0)}
-                      </span>
+                    <div className="relative flex h-40 w-full items-center justify-center overflow-hidden bg-white sm:h-44">
+                      {meta.image ? (
+                        <img src={meta.image} alt={meta.label} className="max-h-full max-w-full object-contain p-1" />
+                      ) : (
+                        <div
+                          className="flex h-full w-full items-center justify-center"
+                          style={{ backgroundColor: meta.bg }}
+                        >
+                          <span className="text-6xl font-extrabold sm:text-7xl" style={{ color: meta.color }}>
+                            {meta.label.charAt(0)}
+                          </span>
+                        </div>
+                      )}
                     </div>
-                    <div className="w-full px-2 py-2 text-center">
-                      <div className="text-xs font-bold sm:text-sm" style={{ color: meta.color }}>
+                    <div className="w-full px-3 py-3 text-center">
+                      <div className="text-base font-bold sm:text-lg" style={{ color: meta.color }}>
                         {meta.label}
                       </div>
-                      <div className="mt-0.5 text-[10px] text-muted-foreground">
+                      <div className="mt-0.5 text-xs text-muted-foreground">
                         {count} {count === 1 ? "item" : "items"}
                       </div>
                     </div>
