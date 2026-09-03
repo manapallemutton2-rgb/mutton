@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, Outlet, useMatches } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { getPhone, getRole } from "@/lib/session";
@@ -35,8 +35,7 @@ export const Route = createFileRoute("/shop")({
 
 function ShopPage() {
   const navigate = useNavigate();
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [activeDot, setActiveDot] = useState(0);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     const phone = getPhone();
@@ -79,15 +78,17 @@ function ShopPage() {
       const bRank = bIdx === -1 ? 999 : bIdx;
       return aRank - bRank;
     });
-  const categoryCounts = categories.reduce(
-    (acc, cat) => {
-      acc[cat] = products.filter((p) => p.category === cat).length;
-      return acc;
-    },
-    {} as Record<string, number>,
-  );
 
   const getCatMeta = (cat: string) => CATEGORY_META[cat] || FALLBACK_META;
+
+  const query = search.trim().toLowerCase();
+  const visibleCategories = query
+    ? categories.filter((cat) => {
+        const label = getCatMeta(cat).label.toLowerCase();
+        if (label.includes(query)) return true;
+        return products.some((p) => p.category === cat && p.name.toLowerCase().includes(query));
+      })
+    : categories;
 
   if (hasChild) {
     return (
@@ -173,79 +174,71 @@ function ShopPage() {
           </div>
         </section>
 
+        {/* SEARCH */}
+        <div className="mx-auto mb-5 max-w-2xl px-1">
+          <label className="flex items-center gap-2.5 rounded-full border bg-card px-4 py-2.5 shadow-sm transition focus-within:shadow-md sm:py-3" style={{ borderColor: "#E5DCC8" }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B4630" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 opacity-60">
+              <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+            </svg>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search for mutton, chicken, fish and more"
+              className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground/60 sm:text-base"
+            />
+            {search && (
+              <button onClick={() => setSearch("")} className="shrink-0 text-muted-foreground/60 hover:text-foreground" aria-label="Clear search">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              </button>
+            )}
+          </label>
+        </div>
+
         {/* CATEGORIES */}
         <div id="category-grid" className="mt-2">
-          <h2 className="mb-3 text-lg font-bold text-foreground sm:text-xl">Choose a Category</h2>
+          <h2 className="mb-3 text-lg font-bold text-foreground sm:text-xl">Shop by Category</h2>
 
           {isLoading ? (
-            <div className="flex gap-4 overflow-hidden">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="h-52 w-48 shrink-0 animate-pulse rounded-2xl bg-muted sm:h-56 sm:w-52" />
+            <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 sm:gap-4 lg:grid-cols-6">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="aspect-square animate-pulse rounded-2xl bg-muted" />
               ))}
             </div>
+          ) : visibleCategories.length === 0 ? (
+            <div className="rounded-2xl border bg-card py-14 text-center">
+              <p className="text-base font-medium text-muted-foreground">No categories match "{search}"</p>
+              <p className="mt-1 text-xs text-muted-foreground/70">Try a different search term</p>
+            </div>
           ) : (
-            <>
-              <div
-                ref={scrollRef}
-                className="hide-scrollbar flex gap-4 overflow-x-auto pb-2"
-                onScroll={() => {
-                  const el = scrollRef.current;
-                  if (!el) return;
-                  const cardWidth = 208 + 16;
-                  const idx = Math.round(el.scrollLeft / cardWidth);
-                  setActiveDot(Math.min(idx, categories.length - 1));
-                }}
-              >
-                {categories.map((cat) => {
-                  const meta = getCatMeta(cat);
-                  const count = categoryCounts[cat] || 0;
-                  return (
-                    <button
-                      key={cat}
-                      onClick={() => navigate({ to: "/shop/$category", params: { category: cat } })}
-                      className="group flex w-48 shrink-0 flex-col overflow-hidden rounded-2xl border bg-card shadow-sm transition hover:shadow-lg active:scale-[0.97] sm:w-52"
+            <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 sm:gap-4 md:grid-cols-5 lg:grid-cols-6">
+              {visibleCategories.map((cat) => {
+                const meta = getCatMeta(cat);
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => navigate({ to: "/shop/$category", params: { category: cat } })}
+                    className="group flex flex-col items-center gap-2 rounded-2xl p-1.5 text-center transition active:scale-[0.96]"
+                  >
+                    <div
+                      className="relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-2xl transition group-hover:shadow-md"
+                      style={{ backgroundColor: meta.bg }}
                     >
-                      <div className="relative flex h-40 w-full items-center justify-center overflow-hidden bg-white sm:h-44">
-                        {meta.image ? (
-                          <img src={meta.image} alt={meta.label} className="max-h-full max-w-full object-contain p-1" />
-                        ) : (
-                          <div
-                            className="flex h-full w-full items-center justify-center"
-                            style={{ backgroundColor: meta.bg }}
-                          >
-                            <span className="text-6xl font-extrabold sm:text-7xl" style={{ color: meta.color }}>
-                              {meta.label.charAt(0)}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="w-full px-3 py-3 text-center">
-                        <div className="text-base font-bold sm:text-lg" style={{ color: meta.color }}>
-                          {meta.label}
-                        </div>
-                        <div className="mt-0.5 text-xs text-muted-foreground">
-                          {count} {count === 1 ? "item" : "items"}
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-              {categories.length > 1 && (
-                <div className="mt-3 flex items-center justify-center gap-1.5">
-                  {categories.map((_, i) => (
-                    <span
-                      key={i}
-                      className={`block rounded-full transition-all duration-300 ${
-                        i === activeDot
-                          ? "h-2 w-2 bg-primary"
-                          : "h-1.5 w-1.5 bg-muted-foreground/30"
-                      }`}
-                    />
-                  ))}
-                </div>
-              )}
-            </>
+                      {meta.image ? (
+                        <img src={meta.image} alt={meta.label} className="h-full w-full object-cover p-2 transition duration-300 group-hover:scale-105" />
+                      ) : (
+                        <span className="text-4xl font-extrabold sm:text-5xl" style={{ color: meta.color }}>
+                          {meta.label.charAt(0)}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs font-semibold leading-tight text-foreground sm:text-sm">
+                      {meta.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           )}
         </div>
       </main>
