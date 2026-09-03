@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, Outlet, useMatches } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { getPhone, getRole } from "@/lib/session";
@@ -35,6 +35,8 @@ export const Route = createFileRoute("/shop")({
 
 function ShopPage() {
   const navigate = useNavigate();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [activeDot, setActiveDot] = useState(0);
 
   useEffect(() => {
     const phone = getPhone();
@@ -182,44 +184,68 @@ function ShopPage() {
               ))}
             </div>
           ) : (
-            <div
-              className="hide-scrollbar flex gap-4 overflow-x-auto pb-2"
-            >
-              {categories.map((cat) => {
-                const meta = getCatMeta(cat);
-                const count = categoryCounts[cat] || 0;
-                return (
-                  <button
-                    key={cat}
-                    onClick={() => navigate({ to: "/shop/$category", params: { category: cat } })}
-                    className="group flex w-48 shrink-0 flex-col overflow-hidden rounded-2xl border bg-card shadow-sm transition hover:shadow-lg active:scale-[0.97] sm:w-52"
-                  >
-                    <div className="relative flex h-40 w-full items-center justify-center overflow-hidden bg-white sm:h-44">
-                      {meta.image ? (
-                        <img src={meta.image} alt={meta.label} className="max-h-full max-w-full object-contain p-1" />
-                      ) : (
-                        <div
-                          className="flex h-full w-full items-center justify-center"
-                          style={{ backgroundColor: meta.bg }}
-                        >
-                          <span className="text-6xl font-extrabold sm:text-7xl" style={{ color: meta.color }}>
-                            {meta.label.charAt(0)}
-                          </span>
+            <>
+              <div
+                ref={scrollRef}
+                className="hide-scrollbar flex gap-4 overflow-x-auto pb-2"
+                onScroll={() => {
+                  const el = scrollRef.current;
+                  if (!el) return;
+                  const cardWidth = 208 + 16;
+                  const idx = Math.round(el.scrollLeft / cardWidth);
+                  setActiveDot(Math.min(idx, categories.length - 1));
+                }}
+              >
+                {categories.map((cat) => {
+                  const meta = getCatMeta(cat);
+                  const count = categoryCounts[cat] || 0;
+                  return (
+                    <button
+                      key={cat}
+                      onClick={() => navigate({ to: "/shop/$category", params: { category: cat } })}
+                      className="group flex w-48 shrink-0 flex-col overflow-hidden rounded-2xl border bg-card shadow-sm transition hover:shadow-lg active:scale-[0.97] sm:w-52"
+                    >
+                      <div className="relative flex h-40 w-full items-center justify-center overflow-hidden bg-white sm:h-44">
+                        {meta.image ? (
+                          <img src={meta.image} alt={meta.label} className="max-h-full max-w-full object-contain p-1" />
+                        ) : (
+                          <div
+                            className="flex h-full w-full items-center justify-center"
+                            style={{ backgroundColor: meta.bg }}
+                          >
+                            <span className="text-6xl font-extrabold sm:text-7xl" style={{ color: meta.color }}>
+                              {meta.label.charAt(0)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="w-full px-3 py-3 text-center">
+                        <div className="text-base font-bold sm:text-lg" style={{ color: meta.color }}>
+                          {meta.label}
                         </div>
-                      )}
-                    </div>
-                    <div className="w-full px-3 py-3 text-center">
-                      <div className="text-base font-bold sm:text-lg" style={{ color: meta.color }}>
-                        {meta.label}
+                        <div className="mt-0.5 text-xs text-muted-foreground">
+                          {count} {count === 1 ? "item" : "items"}
+                        </div>
                       </div>
-                      <div className="mt-0.5 text-xs text-muted-foreground">
-                        {count} {count === 1 ? "item" : "items"}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+                    </button>
+                  );
+                })}
+              </div>
+              {categories.length > 1 && (
+                <div className="mt-3 flex items-center justify-center gap-1.5">
+                  {categories.map((_, i) => (
+                    <span
+                      key={i}
+                      className={`block rounded-full transition-all duration-300 ${
+                        i === activeDot
+                          ? "h-2 w-2 bg-primary"
+                          : "h-1.5 w-1.5 bg-muted-foreground/30"
+                      }`}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
       </main>
