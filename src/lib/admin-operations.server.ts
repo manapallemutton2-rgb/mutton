@@ -53,6 +53,7 @@ export const adminInsertProduct = createServerFn({ method: "POST" })
       image_url: d.image_url ? String(d.image_url) : null,
       stock: stock,
       active: true,
+      category: String(d.category || "other"),
     };
   })
   .handler(async ({ data }) => {

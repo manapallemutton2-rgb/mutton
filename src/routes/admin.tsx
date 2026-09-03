@@ -61,6 +61,7 @@ type Product = {
   unit: string;
   price: number;
   active: boolean;
+  category: string;
   image_url?: string | null;
   stock?: number | null;
 };
@@ -206,7 +207,7 @@ function StatsTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, unit, price, image_url, active, created_at, stock")
+        .select("id, name, unit, price, image_url, active, category, created_at, stock")
         .order("name");
       if (error) {
         console.error("Failed to load products:", error);
@@ -766,7 +767,7 @@ function ItemSalesTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, unit, price, active, image_url, stock")
+        .select("id, name, unit, price, active, image_url, category, stock")
         .order("name");
       if (error) return [];
       return (data as Product[]) || [];
@@ -2134,6 +2135,7 @@ function ProductsTab() {
   const [unit, setUnit] = useState("kg");
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
+  const [category, setCategory] = useState("mutton");
   const [imageUrl, setImageUrl] = useState("");
   const [uploadingId, setUploadingId] = useState<string | null>(null);
 
@@ -2142,7 +2144,7 @@ function ProductsTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, unit, price, image_url, active, created_at, stock")
+        .select("id, name, unit, price, image_url, active, category, created_at, stock")
         .order("name");
       if (error) {
         console.error("Failed to load products:", error);
@@ -2174,6 +2176,7 @@ function ProductsTab() {
           price: Number(price),
           stock: stock || null,
           image_url: imageUrl.trim() || null,
+          category,
         },
       });
     },
@@ -2181,6 +2184,7 @@ function ProductsTab() {
       setName("");
       setPrice("");
       setStock("");
+      setCategory("mutton");
       setImageUrl("");
       queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
       queryClient.invalidateQueries({ queryKey: ["products", "active"] });
@@ -2219,6 +2223,7 @@ function ProductsTab() {
         price?: number;
         stock?: number | null;
         active?: boolean;
+        category?: string;
         image_url?: string | null;
       };
     }) => {
@@ -2325,7 +2330,7 @@ function ProductsTab() {
     <div>
       <form
         onSubmit={add}
-        className="mb-5 grid gap-3 rounded-xl border bg-card p-4 sm:p-6 sm:grid-cols-2 lg:grid-cols-6"
+        className="mb-5 grid gap-3 rounded-xl border bg-card p-4 sm:p-6 sm:grid-cols-2 lg:grid-cols-7"
       >
         <input
           value={name}
@@ -2333,6 +2338,18 @@ function ProductsTab() {
           placeholder="Product name"
           className="rounded-xl border bg-background px-4 py-4 text-base"
         />
+        <select
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          className="rounded-xl border bg-background px-4 py-4 text-base"
+        >
+          <option value="mutton">Mutton</option>
+          <option value="chicken">Chicken</option>
+          <option value="fish">Fish</option>
+          <option value="prawns">Prawns</option>
+          <option value="eggs">Eggs</option>
+          <option value="other">Other</option>
+        </select>
         <select
           value={unit}
           onChange={(e) => setUnit(e.target.value)}
@@ -2382,6 +2399,7 @@ function ProductsTab() {
             <tr>
               <th className="p-3">Image</th>
               <th className="p-3">Name</th>
+              <th className="p-3">Category</th>
               <th className="p-3">Unit</th>
               <th className="p-3">Price</th>
               <th className="p-3">Stock</th>
@@ -2402,6 +2420,11 @@ function ProductsTab() {
                 </td>
                 <td className="p-3">
                   <input defaultValue={p.name} onBlur={(e) => updateName(p, e.target.value)} className="w-full min-w-[120px] rounded-xl border bg-background px-3 py-2 text-base" />
+                </td>
+                <td className="p-3">
+                  <select defaultValue={p.category} onChange={(e) => updateProductMutation.mutate({ id: p.id, updates: { category: e.target.value } })} className="rounded-xl border bg-background px-3 py-2 text-base">
+                    <option value="mutton">Mutton</option><option value="chicken">Chicken</option><option value="fish">Fish</option><option value="prawns">Prawns</option><option value="eggs">Eggs</option><option value="other">Other</option>
+                  </select>
                 </td>
                 <td className="p-3">
                   <select defaultValue={p.unit} onChange={(e) => updateUnit(p, e.target.value)} className="rounded-xl border bg-background px-3 py-2 text-base">
@@ -2454,6 +2477,9 @@ function ProductsTab() {
               <div className="min-w-0 flex-1">
                 <input defaultValue={p.name} onBlur={(e) => updateName(p, e.target.value)} className="w-full rounded-lg border bg-background px-3 py-1.5 text-sm font-medium" />
                 <div className="mt-2 flex flex-wrap gap-2">
+                  <select defaultValue={p.category} onChange={(e) => updateProductMutation.mutate({ id: p.id, updates: { category: e.target.value } })} className="rounded-lg border bg-background px-2 py-1 text-xs">
+                    <option value="mutton">Mutton</option><option value="chicken">Chicken</option><option value="fish">Fish</option><option value="prawns">Prawns</option><option value="eggs">Eggs</option><option value="other">Other</option>
+                  </select>
                   <select defaultValue={p.unit} onChange={(e) => updateUnit(p, e.target.value)} className="rounded-lg border bg-background px-2 py-1 text-xs">
                     <option value="kg">kg</option><option value="500g">500g</option><option value="750g">750g</option><option value="dozen">dozen</option><option value="piece">piece</option><option value="tray">Tray (30)</option>
                   </select>
