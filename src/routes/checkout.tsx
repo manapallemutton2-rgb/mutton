@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle, ArrowLeft, Bluetooth, MapPin, Home, FileText, Truck } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
+import { OrdersClosedBanner } from "@/components/OrdersClosedBanner";
 import { supabase } from "@/integrations/supabase/client";
 import { CartItem, cartTotal, clearCart, getCart } from "@/lib/cart";
 import { getPhone, getName } from "@/lib/session";
@@ -358,6 +359,7 @@ function CheckoutPage() {
     <div className="min-h-screen bg-background">
       <AppHeader title="Checkout" />
       <main className="mx-auto max-w-5xl px-3 py-4 sm:px-4 sm:py-6">
+        <OrdersClosedBanner />
         <Link
           to="/cart"
           className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground transition hover:text-foreground sm:mb-6 sm:text-base"

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Minus, Plus, Trash2, ShoppingBag } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
+import { OrdersClosedBanner } from "@/components/OrdersClosedBanner";
 import { supabase } from "@/integrations/supabase/client";
 import { CartItem, cartTotal, getCart, removeFromCart, updateQty, unitToKg } from "@/lib/cart";
 import { getPhone } from "@/lib/session";
@@ -68,11 +69,7 @@ function CartPage() {
     <div className="min-h-screen bg-background">
       <AppHeader title="Cart" />
       <main className="mx-auto max-w-3xl px-3 py-4 sm:px-4 sm:py-6">
-        {!ordersOpen && (
-          <div className="mb-4 rounded-xl border-2 border-red-300 bg-red-50 p-4 text-center text-base font-semibold text-red-700">
-            Orders are currently closed. You cannot place orders right now.
-          </div>
-        )}
+        <OrdersClosedBanner />
         <Link
           to="/shop"
           className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground transition hover:text-foreground sm:mb-6 sm:text-base"

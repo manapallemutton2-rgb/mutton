@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { getPhone, getRole } from "@/lib/session";
 import { AppHeader } from "@/components/AppHeader";
+import { OrdersClosedBanner } from "@/components/OrdersClosedBanner";
 
 type Product = {
   id: string;
@@ -98,6 +99,7 @@ function ShopPage() {
     <div className="min-h-screen bg-background">
       <AppHeader title="Shop" />
       <main className="mx-auto max-w-6xl px-3 py-4 sm:px-4 sm:py-6">
+        <OrdersClosedBanner />
         {/* HERO */}
         <section className="relative overflow-hidden" style={{ backgroundColor: "#F4EAD5" }}>
           <div className="absolute inset-0 opacity-10">
@@ -181,8 +183,7 @@ function ShopPage() {
             </div>
           ) : (
             <div
-              className="flex gap-4 overflow-x-auto pb-2"
-              style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}
+              className="hide-scrollbar flex gap-4 overflow-x-auto pb-2"
             >
               {categories.map((cat) => {
                 const meta = getCatMeta(cat);

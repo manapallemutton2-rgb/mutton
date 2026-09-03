@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AppHeader } from "@/components/AppHeader";
+import { OrdersClosedBanner } from "@/components/OrdersClosedBanner";
 import { AboutSection } from "@/components/AboutSection";
 
 export const Route = createFileRoute("/about")({
@@ -12,6 +13,7 @@ function AboutPage() {
     <div className="min-h-screen bg-background">
       <AppHeader title="About Us" />
       <main className="mx-auto max-w-2xl px-4 py-8 sm:py-12">
+        <OrdersClosedBanner />
         <AboutSection />
         <div className="mt-4 space-y-1 rounded-xl bg-muted/30 px-5 py-4 text-sm text-muted-foreground">
           <p>Village Gungal, Yacharam Mandal,</p>

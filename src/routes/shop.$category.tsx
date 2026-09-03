@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getPhone, getRole } from "@/lib/session";
 import { addToCart, getCart } from "@/lib/cart";
 import { AppHeader } from "@/components/AppHeader";
+import { OrdersClosedBanner } from "@/components/OrdersClosedBanner";
 
 type Product = {
   id: string;
@@ -143,6 +144,7 @@ function CategoryPage() {
     <div className="min-h-screen bg-background">
       <AppHeader title={catMeta.label} />
       <main className="mx-auto max-w-6xl px-3 py-4 sm:px-4 sm:py-6">
+        <OrdersClosedBanner />
         {/* ORDERS CLOSED POPUP */}
         {showClosedPopup && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-6">
