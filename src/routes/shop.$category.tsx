@@ -17,6 +17,7 @@ type Product = {
   category: string;
   image_url?: string | null;
   stock?: number | null;
+  priority?: number | null;
 };
 
 const SIZE_OPTIONS = [
@@ -24,15 +25,29 @@ const SIZE_OPTIONS = [
   { label: "750g", multiplier: 0.75 },
   { label: "1kg", multiplier: 1 },
 ];
+// Size options for different categories
+const ALL_SIZE_OPTIONS = SIZE_OPTIONS;
 
-const CATEGORY_META: Record<string, { label: string; color: string; bg: string; image?: string }> = {
-  mutton: { label: "Mutton", color: "#C94F5C", bg: "#FDE8E8", image: "/mutton.avif" },
-  chicken: { label: "Chicken", color: "#D97706", bg: "#FEF3C7", image: "/chicken.webp" },
-  fish: { label: "Fish", color: "#0284C7", bg: "#E0F2FE", image: "/fish.jpg" },
-  prawns: { label: "Prawns", color: "#EA580C", bg: "#FFF7ED", image: "/fish.jpg" },
-  eggs: { label: "Eggs", color: "#7C3AED", bg: "#F5F3FF", image: "/Eggs.avif" },
-  other: { label: "Other", color: "#6B7280", bg: "#F3F4F6" },
-};
+// Get size options based on category
+function getCategorySizeOptions(cat: string) {
+  if (cat === "fish" || cat === "prawns") {
+    // Fish and prawns: only 1kg
+    return [{ label: "1kg", multiplier: 1 }];
+  }
+  // All other categories: 500g, 750g, 1kg
+  return ALL_SIZE_OPTIONS;
+}
+
+
+
+const CATEGORY_META: Record<string, { label: string; color: string; bg: string; image?: string }> =
+  {
+    mutton: { label: "Mutton", color: "#C94F5C", bg: "#FDE8E8", image: "/mutton.avif" },
+    chicken: { label: "Chicken", color: "#D97706", bg: "#FEF3C7", image: "/chicken.webp" },
+    fish: { label: "Fish", color: "#0284C7", bg: "#E0F2FE", image: "/fish.jpg" },
+    prawns: { label: "Prawns", color: "#EA580C", bg: "#FFF7ED", image: "/fish.jpg" },
+    eggs: { label: "Eggs", color: "#7C3AED", bg: "#F5F3FF", image: "/Eggs.avif" },
+  };
 
 const FALLBACK_META = { label: "Other", color: "#6B7280", bg: "#F3F4F6" };
 
@@ -40,7 +55,7 @@ export const Route = createFileRoute("/shop/$category")({
   component: CategoryPage,
   head: ({ params }) => {
     const meta = CATEGORY_META[params.category] || FALLBACK_META;
-    return { meta: [{ title: `${meta.label} - Manapalle Mutton` }] };
+    return { meta: [{ title: `${meta.label} - Manapalle Products` }] };
   },
 });
 
@@ -87,12 +102,19 @@ function CategoryPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, unit, price, image_url, active, category, stock");
+        .select("id, name, unit, price, image_url, active, category, stock, priority");
       if (error) {
         console.error("Failed to load products:", error);
         return [];
       }
-      return (data as Product[]) || [];
+      const result = (data as Product[]) || [];
+      result.sort((a, b) => {
+        const pa = a.priority ?? 9999;
+        const pb = b.priority ?? 9999;
+        if (pa !== pb) return pa - pb;
+        return a.name.localeCompare(b.name);
+      });
+      return result;
     },
     staleTime: 60_000,
   });
@@ -127,7 +149,7 @@ function CategoryPage() {
     const cart = getCart();
     const inCart = cart.find((c) => c.product_id === p.id && c.unit === sizeLabel);
     const inCartQty = inCart ? inCart.quantity : 0;
-    const sizeMultiplier = SIZE_OPTIONS.find((s) => s.label === sizeLabel)?.multiplier ?? 1;
+    const sizeMultiplier = ALL_SIZE_OPTIONS.find((s) => s.label === sizeLabel)?.multiplier ?? 1;
     const cartKg = inCartQty * sizeMultiplier;
     if (p.stock != null && cartKg >= p.stock) {
       return;
@@ -156,11 +178,24 @@ function CategoryPage() {
                 <X className="h-5 w-5" />
               </button>
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-100">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#C94F5C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-7 w-7"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#C94F5C"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-7 w-7"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="15" y1="9" x2="9" y2="15" />
+                  <line x1="9" y1="9" x2="15" y2="15" />
+                </svg>
               </div>
               <h3 className="text-center text-lg font-bold text-gray-900">Orders are Closed</h3>
               <p className="mt-2 text-center text-sm text-gray-500">
-                We are not accepting orders right now. Please check back later or call us for inquiries.
+                We are not accepting orders right now. Please check back later or call us for
+                inquiries.
               </p>
               <div className="mt-5 flex gap-3">
                 <a
@@ -220,7 +255,17 @@ function CategoryPage() {
             {catMeta.image ? (
               <img src={catMeta.image} alt={catMeta.label} className="h-full w-full object-cover" />
             ) : (
-              <span className="text-sm font-bold text-white" style={{ backgroundColor: catMeta.color, width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span
+                className="text-sm font-bold text-white"
+                style={{
+                  backgroundColor: catMeta.color,
+                  width: "100%",
+                  height: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
                 {catMeta.label.charAt(0)}
               </span>
             )}
@@ -250,17 +295,13 @@ function CategoryPage() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="rounded-xl border bg-card py-16 text-center">
-            <p className="text-lg font-medium text-muted-foreground">
-              No products found
-            </p>
-            <p className="mt-2 text-sm text-muted-foreground/70">
-              Try a different search term
-            </p>
+            <p className="text-lg font-medium text-muted-foreground">No products found</p>
+            <p className="mt-2 text-sm text-muted-foreground/70">Try a different search term</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
             {filtered.map((p, idx) => {
-              const sizes = hasSizes(p) ? SIZE_OPTIONS : null;
+              const sizes = hasSizes(p) ? getCategorySizeOptions(category) : null;
               return (
                 <div
                   key={p.id}
@@ -292,7 +333,9 @@ function CategoryPage() {
                           const calcPrice = Math.round(p.price * size.multiplier);
                           const key = p.id + "|" + size.label;
                           const isAdded = added === key;
-                          const cartItem = getCart().find((c) => c.product_id === p.id && c.unit === size.label);
+                          const cartItem = getCart().find(
+                            (c) => c.product_id === p.id && c.unit === size.label,
+                          );
                           const cartKg = (cartItem?.quantity ?? 0) * size.multiplier;
                           const outOfStock = p.stock != null && cartKg >= p.stock;
                           const remaining = p.stock != null ? Math.max(0, p.stock - cartKg) : null;
@@ -307,8 +350,12 @@ function CategoryPage() {
                                 <span className="font-medium">{size.label}</span>
                                 <span className="ml-1 text-muted-foreground">INR {calcPrice}</span>
                                 {remaining !== null && remaining <= 2 && (
-                                  <span className={`ml-1 ${outOfStock ? "text-red-500" : "text-orange-500"}`}>
-                                    {outOfStock ? "Out" : `${remaining % 1 === 0 ? remaining.toFixed(0) : remaining.toFixed(1)}kg`}
+                                  <span
+                                    className={`ml-1 ${outOfStock ? "text-red-500" : "text-orange-500"}`}
+                                  >
+                                    {outOfStock
+                                      ? "Out"
+                                      : `${remaining % 1 === 0 ? remaining.toFixed(0) : remaining.toFixed(1)}kg`}
                                   </span>
                                 )}
                               </div>
@@ -344,20 +391,27 @@ function CategoryPage() {
                     ) : (
                       <div className="mt-auto pt-2">
                         {(() => {
-                          const cartItem = getCart().find((c) => c.product_id === p.id && c.unit === p.unit);
+                          const cartItem = getCart().find(
+                            (c) => c.product_id === p.id && c.unit === p.unit,
+                          );
                           const cartQty = cartItem?.quantity ?? 0;
                           const outOfStock = p.stock != null && cartQty >= p.stock;
                           const remaining = p.stock != null ? Math.max(0, p.stock - cartQty) : null;
-                          const unitDisplay = p.unit === "tray" ? "Tray" : p.unit === "dozen" ? "Dozen" : p.unit;
+                          const unitDisplay =
+                            p.unit === "tray" ? "Tray" : p.unit === "dozen" ? "Dozen" : p.unit;
                           return (
                             <div className="flex items-center justify-between gap-2">
                               <div>
-                                <p className="text-[10px] text-muted-foreground">per {unitDisplay}</p>
+                                <p className="text-[10px] text-muted-foreground">
+                                  per {unitDisplay}
+                                </p>
                                 <span className="text-sm font-bold text-primary">
                                   INR {Number(p.price).toFixed(0)}
                                 </span>
                                 {remaining !== null && remaining <= 2 && (
-                                  <span className={`ml-1 text-[10px] ${outOfStock ? "text-red-500" : "text-orange-500"}`}>
+                                  <span
+                                    className={`ml-1 text-[10px] ${outOfStock ? "text-red-500" : "text-orange-500"}`}
+                                  >
                                     {outOfStock ? "Out" : `${remaining} left`}
                                   </span>
                                 )}
@@ -375,11 +429,15 @@ function CategoryPage() {
                                   }`}
                                 >
                                   {added === p.id + "|" + p.unit ? (
-                                    <><Check className="h-3 w-3" /> Added</>
+                                    <>
+                                      <Check className="h-3 w-3" /> Added
+                                    </>
                                   ) : outOfStock ? (
                                     "Out"
                                   ) : (
-                                    <><Plus className="h-3 w-3" /> Add</>
+                                    <>
+                                      <Plus className="h-3 w-3" /> Add
+                                    </>
                                   )}
                                 </button>
                               ) : (

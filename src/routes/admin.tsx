@@ -39,7 +39,12 @@ import {
 import { AppHeader } from "@/components/AppHeader";
 import { supabase } from "@/integrations/supabase/client";
 import { getPhone, getRole } from "@/lib/session";
-import { isPrinterConnected, printReceipt as btPrintReceipt, printMultipleReceipts as btPrintMultiple, ReceiptData } from "@/lib/bt-printer";
+import {
+  isPrinterConnected,
+  printReceipt as btPrintReceipt,
+  printMultipleReceipts as btPrintMultiple,
+  ReceiptData,
+} from "@/lib/bt-printer";
 import {
   adminUpdateProduct,
   adminDeleteProduct,
@@ -49,6 +54,9 @@ import {
   adminDeleteCommunity,
   adminInsertBlock,
   adminDeleteBlock,
+  adminInsertCategory,
+  adminUpdateCategory,
+  adminDeleteCategory,
   adminRemoveProductImage,
   adminDeleteOrder,
   adminDeleteAllOrders,
@@ -64,7 +72,23 @@ type Product = {
   category: string;
   image_url?: string | null;
   stock?: number | null;
+  priority?: number | null;
 };
+type Category = {
+  id: string;
+  name: string;
+  slug: string;
+  priority?: number | null;
+  image_url?: string | null;
+  created_at?: string;
+};
+type CategoryQueryClient = {
+  from: (table: "categories") => {
+    select: (columns: string) => Promise<{ data: unknown[] | null; error: unknown | null }>;
+  };
+};
+
+const categoryQueryClient = supabase as unknown as CategoryQueryClient;
 type Community = { id: string; name: string };
 type Block = { id: string; community_id: string; name: string };
 type Order = {
@@ -94,10 +118,17 @@ const ORDERS_PER_PAGE = 50;
 
 export const Route = createFileRoute("/admin")({
   component: AdminPage,
-  head: () => ({ meta: [{ title: "Admin - Manapalle Mutton" }] }),
+  head: () => ({ meta: [{ title: "Admin - Manapalle Products" }] }),
 });
 
-type Tab = "stats" | "orders" | "items" | "products" | "communities" | "settings";
+type Tab =
+  | "stats"
+  | "orders"
+  | "items"
+  | "products"
+  | "categories"
+  | "communities"
+  | "settings";
 
 function AdminPage() {
   const navigate = useNavigate();
@@ -121,24 +152,29 @@ function AdminPage() {
       <AppHeader title="Admin" />
       <main className="mx-auto max-w-6xl px-3 py-4 sm:px-4 sm:py-6">
         <div className="no-print mb-5 flex gap-1 overflow-x-auto border-b sm:gap-2">
-          {(["stats", "orders", "items", "products", "communities", "settings"] as Tab[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`whitespace-nowrap px-3 py-2.5 text-sm font-medium capitalize transition sm:px-5 sm:py-3 sm:text-base ${
-                tab === t
-                  ? "border-b-2 border-primary text-primary"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {t}
-            </button>
-          ))}
+          {(
+            ["stats", "orders", "items", "products", "categories", "communities", "settings"] as Tab[]
+          ).map(
+            (t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={`whitespace-nowrap px-3 py-2.5 text-sm font-medium capitalize transition sm:px-5 sm:py-3 sm:text-base ${
+                  tab === t
+                    ? "border-b-2 border-primary text-primary"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {t}
+              </button>
+            ),
+          )}
         </div>
         {tab === "stats" && <StatsTab />}
         {tab === "orders" && <OrdersTab />}
         {tab === "items" && <ItemSalesTab />}
         {tab === "products" && <ProductsTab />}
+        {tab === "categories" && <CategoriesTab />}
         {tab === "communities" && <CommunitiesTab />}
         {tab === "settings" && <SettingsTab />}
       </main>
@@ -169,7 +205,16 @@ function unitCount(unit: string, quantity: number): number {
   return 0;
 }
 
-const CHART_COLORS = ["#e11d48", "#2563eb", "#16a34a", "#f59e0b", "#8b5cf6", "#06b6d4", "#f97316", "#ec4899"];
+const CHART_COLORS = [
+  "#e11d48",
+  "#2563eb",
+  "#16a34a",
+  "#f59e0b",
+  "#8b5cf6",
+  "#06b6d4",
+  "#f97316",
+  "#ec4899",
+];
 
 /* ---------------- Stats ---------------- */
 function StatsTab() {
@@ -279,12 +324,29 @@ function StatsTab() {
   // --- Chart Data ---
 
   // Daily revenue for last 14 days - split by Mutton / Chicken / Other (Line Chart)
-  const dailyRevenueMap = new Map<string, { mutton: number; chicken: number; other: number; mOrders: number; cOrders: number; oOrders: number }>();
+  const dailyRevenueMap = new Map<
+    string,
+    {
+      mutton: number;
+      chicken: number;
+      other: number;
+      mOrders: number;
+      cOrders: number;
+      oOrders: number;
+    }
+  >();
   for (let i = 13; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const key = d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
-    dailyRevenueMap.set(key, { mutton: 0, chicken: 0, other: 0, mOrders: 0, cOrders: 0, oOrders: 0 });
+    dailyRevenueMap.set(key, {
+      mutton: 0,
+      chicken: 0,
+      other: 0,
+      mOrders: 0,
+      cOrders: 0,
+      oOrders: 0,
+    });
   }
   allOrders.forEach((o) => {
     const d = new Date(o.created_at);
@@ -292,16 +354,27 @@ function StatsTab() {
     const entry = dailyRevenueMap.get(key);
     if (!entry) return;
     const oItems = items.filter((i) => i.order_id === o.id);
-    let mTotal = 0, cTotal = 0, oTotal = 0;
+    let mTotal = 0,
+      cTotal = 0,
+      oTotal = 0;
     oItems.forEach((it) => {
       const amt = Number(it.price) * Number(it.quantity);
       if (it.product_name.toLowerCase().startsWith("mutton")) mTotal += amt;
       else if (it.product_name.toLowerCase().startsWith("chicken")) cTotal += amt;
       else oTotal += amt;
     });
-    if (mTotal > 0) { entry.mutton += mTotal; entry.mOrders += 1; }
-    if (cTotal > 0) { entry.chicken += cTotal; entry.cOrders += 1; }
-    if (oTotal > 0) { entry.other += oTotal; entry.oOrders += 1; }
+    if (mTotal > 0) {
+      entry.mutton += mTotal;
+      entry.mOrders += 1;
+    }
+    if (cTotal > 0) {
+      entry.chicken += cTotal;
+      entry.cOrders += 1;
+    }
+    if (oTotal > 0) {
+      entry.other += oTotal;
+      entry.oOrders += 1;
+    }
   });
   const dailyRevenueData = Array.from(dailyRevenueMap.entries()).map(([date, v]) => ({
     date,
@@ -323,7 +396,11 @@ function StatsTab() {
       existing.qty += it.quantity;
       existing.revenue += it.price * it.quantity;
     } else {
-      map.set(it.product_name, { name: it.product_name, qty: it.quantity, revenue: it.price * it.quantity });
+      map.set(it.product_name, {
+        name: it.product_name,
+        qty: it.quantity,
+        revenue: it.price * it.quantity,
+      });
     }
   });
   const topMuttonProducts = Array.from(muttonProductMap.values())
@@ -343,13 +420,21 @@ function StatsTab() {
     oItems.forEach((it) => {
       const amt = Number(it.price) * Number(it.quantity);
       if (it.product_name.toLowerCase().startsWith("mutton")) {
-        muttonByCommunity.set(o.community_name, (muttonByCommunity.get(o.community_name) || 0) + amt);
+        muttonByCommunity.set(
+          o.community_name,
+          (muttonByCommunity.get(o.community_name) || 0) + amt,
+        );
       } else if (it.product_name.toLowerCase().startsWith("chicken")) {
-        chickenByCommunity.set(o.community_name, (chickenByCommunity.get(o.community_name) || 0) + amt);
+        chickenByCommunity.set(
+          o.community_name,
+          (chickenByCommunity.get(o.community_name) || 0) + amt,
+        );
       }
     });
   });
-  const allCommunityNames = Array.from(new Set([...muttonByCommunity.keys(), ...chickenByCommunity.keys()]));
+  const allCommunityNames = Array.from(
+    new Set([...muttonByCommunity.keys(), ...chickenByCommunity.keys()]),
+  );
   const muttonChickenByCommunity = allCommunityNames.map((name) => ({
     name,
     mutton: Math.round(muttonByCommunity.get(name) || 0),
@@ -409,18 +494,23 @@ function StatsTab() {
       {/* Mutton / Chicken sold */}
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="rounded-xl border bg-card p-6">
-          <div className="flex items-center gap-2 text-base text-muted-foreground">
-            Mutton Sold
-          </div>
+          <div className="flex items-center gap-2 text-base text-muted-foreground">Mutton Sold</div>
           <div className="mt-2 text-3xl font-bold text-primary">
             {muttonKg > 0 && (
-              <>{muttonKg % 1 === 0 ? muttonKg.toFixed(0) : muttonKg.toFixed(2)} <span className="text-lg font-normal text-muted-foreground">kg</span></>
+              <>
+                {muttonKg % 1 === 0 ? muttonKg.toFixed(0) : muttonKg.toFixed(2)}{" "}
+                <span className="text-lg font-normal text-muted-foreground">kg</span>
+              </>
             )}
             {muttonKg > 0 && muttonPcs > 0 && <span className="mx-2 text-muted-foreground">/</span>}
             {muttonPcs > 0 && (
-              <>{muttonPcs} <span className="text-lg font-normal text-muted-foreground">pcs</span></>
+              <>
+                {muttonPcs} <span className="text-lg font-normal text-muted-foreground">pcs</span>
+              </>
             )}
-            {muttonKg === 0 && muttonPcs === 0 && <span className="text-lg text-muted-foreground">0</span>}
+            {muttonKg === 0 && muttonPcs === 0 && (
+              <span className="text-lg text-muted-foreground">0</span>
+            )}
           </div>
         </div>
         <div className="rounded-xl border bg-card p-6">
@@ -429,13 +519,22 @@ function StatsTab() {
           </div>
           <div className="mt-2 text-3xl font-bold text-primary">
             {chickenKg > 0 && (
-              <>{chickenKg % 1 === 0 ? chickenKg.toFixed(0) : chickenKg.toFixed(2)} <span className="text-lg font-normal text-muted-foreground">kg</span></>
+              <>
+                {chickenKg % 1 === 0 ? chickenKg.toFixed(0) : chickenKg.toFixed(2)}{" "}
+                <span className="text-lg font-normal text-muted-foreground">kg</span>
+              </>
             )}
-            {chickenKg > 0 && chickenPcs > 0 && <span className="mx-2 text-muted-foreground">/</span>}
+            {chickenKg > 0 && chickenPcs > 0 && (
+              <span className="mx-2 text-muted-foreground">/</span>
+            )}
             {chickenPcs > 0 && (
-              <>{chickenPcs} <span className="text-lg font-normal text-muted-foreground">pcs</span></>
+              <>
+                {chickenPcs} <span className="text-lg font-normal text-muted-foreground">pcs</span>
+              </>
             )}
-            {chickenKg === 0 && chickenPcs === 0 && <span className="text-lg text-muted-foreground">0</span>}
+            {chickenKg === 0 && chickenPcs === 0 && (
+              <span className="text-lg text-muted-foreground">0</span>
+            )}
           </div>
         </div>
       </div>
@@ -452,20 +551,41 @@ function StatsTab() {
       {/* Line Chart - Daily Revenue by Mutton / Chicken */}
       {dailyRevenueData.length > 0 && (
         <div className="rounded-xl border bg-card p-6">
-          <h3 className="mb-4 text-lg font-semibold">Daily Revenue - Mutton vs Chicken (Last 14 Days)</h3>
+          <h3 className="mb-4 text-lg font-semibold">
+            Daily Revenue - Mutton vs Chicken (Last 14 Days)
+          </h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={dailyRevenueData}>
                 <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
                 <XAxis dataKey="date" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip
-                  contentStyle={{ borderRadius: 12, border: "1px solid #e5e7eb" }}
-                />
+                <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #e5e7eb" }} />
                 <Legend />
-                <Line type="monotone" dataKey="mutton" stroke="#e11d48" strokeWidth={2} dot={false} name="Mutton" />
-                <Line type="monotone" dataKey="chicken" stroke="#f59e0b" strokeWidth={2} dot={false} name="Chicken" />
-                <Line type="monotone" dataKey="other" stroke="#6b7280" strokeWidth={2} dot={false} name="Other" />
+                <Line
+                  type="monotone"
+                  dataKey="mutton"
+                  stroke="#e11d48"
+                  strokeWidth={2}
+                  dot={false}
+                  name="Mutton"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="chicken"
+                  stroke="#f59e0b"
+                  strokeWidth={2}
+                  dot={false}
+                  name="Chicken"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="yabe"
+                  stroke="#6b7280"
+                  strokeWidth={2}
+                  dot={false}
+                  name="yabe"
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -484,7 +604,12 @@ function StatsTab() {
                   <XAxis type="number" tick={{ fontSize: 11 }} />
                   <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={110} />
                   <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #e5e7eb" }} />
-                  <Bar dataKey="revenue" fill="#e11d48" radius={[0, 6, 6, 0]} name="Revenue (INR)" />
+                  <Bar
+                    dataKey="revenue"
+                    fill="#e11d48"
+                    radius={[0, 6, 6, 0]}
+                    name="Revenue (INR)"
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -500,7 +625,12 @@ function StatsTab() {
                   <XAxis type="number" tick={{ fontSize: 11 }} />
                   <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={110} />
                   <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #e5e7eb" }} />
-                  <Bar dataKey="revenue" fill="#f59e0b" radius={[0, 6, 6, 0]} name="Revenue (INR)" />
+                  <Bar
+                    dataKey="revenue"
+                    fill="#f59e0b"
+                    radius={[0, 6, 6, 0]}
+                    name="Revenue (INR)"
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -549,9 +679,7 @@ function StatsTab() {
                     <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip
-                  contentStyle={{ borderRadius: 12, border: "1px solid #e5e7eb" }}
-                />
+                <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #e5e7eb" }} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -568,9 +696,7 @@ function StatsTab() {
                 <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
                 <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip
-                  contentStyle={{ borderRadius: 12, border: "1px solid #e5e7eb" }}
-                />
+                <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #e5e7eb" }} />
                 <Legend />
                 <Bar dataKey="revenue" fill="#e11d48" radius={[6, 6, 0, 0]} name="Revenue" />
                 <Bar dataKey="orders" fill="#2563eb" radius={[6, 6, 0, 0]} name="Orders" />
@@ -660,15 +786,24 @@ function StatsTab() {
 }
 
 /* ---------------- Item Sales ---------------- */
-type CategoryFilter = "all" | "mutton" | "chicken" | "other";
+type CategoryFilter = "all" | "mutton" | "chicken" | "yabe";
 
-type ItemStat = { name: string; unit: string; qty: number; kgSold: number; pcsSold: number; revenue: number; orderCount: number; currentStock: number | null };
+type ItemStat = {
+  name: string;
+  unit: string;
+  qty: number;
+  kgSold: number;
+  pcsSold: number;
+  revenue: number;
+  orderCount: number;
+  currentStock: number | null;
+};
 
-function categorizeProduct(name: string): "mutton" | "chicken" | "other" {
+function categorizeProduct(name: string): "mutton" | "chicken" | "yabe" {
   const n = name.toLowerCase();
   if (n.startsWith("mutton")) return "mutton";
   if (n.startsWith("chicken")) return "chicken";
-  return "other";
+  return "yabe";
 }
 
 function todayDateString(): string {
@@ -687,13 +822,7 @@ function formatDDMMYYYY(yyyymmdd: string): string {
   return `${d}/${m}/${y}`;
 }
 
-function DateCalendarPicker({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-}) {
+function DateCalendarPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const openPicker = (e: React.MouseEvent<HTMLInputElement>) => {
@@ -797,7 +926,7 @@ function ItemSalesTab() {
         const sel = new Date(y, m - 1, dd);
         return d.toDateString() === sel.toDateString();
       })
-      .map((o) => o.id)
+      .map((o) => o.id),
   );
 
   const filteredItems = items.filter((i) => filteredOrderIds.has(i.order_id));
@@ -833,18 +962,24 @@ function ItemSalesTab() {
     }
   });
 
-  let allProductStats = Array.from(productMap.values());
-  allProductStats.sort((a, b) => (sortBy === "revenue" ? b.revenue - a.revenue : b.kgSold - a.kgSold));
+  const allProductStats = Array.from(productMap.values());
+  allProductStats.sort((a, b) =>
+    sortBy === "revenue" ? b.revenue - a.revenue : b.kgSold - a.kgSold,
+  );
 
   // Split by category
   const muttonStats = allProductStats.filter((p) => categorizeProduct(p.name) === "mutton");
   const chickenStats = allProductStats.filter((p) => categorizeProduct(p.name) === "chicken");
-  const otherStats = allProductStats.filter((p) => categorizeProduct(p.name) === "other");
+  const otherStats = allProductStats.filter((p) => categorizeProduct(p.name) === "yabe");
 
-  const visibleStats = category === "all" ? allProductStats
-    : category === "mutton" ? muttonStats
-    : category === "chicken" ? chickenStats
-    : otherStats;
+  const visibleStats =
+    category === "all"
+      ? allProductStats
+      : category === "mutton"
+        ? muttonStats
+        : category === "chicken"
+          ? chickenStats
+          : otherStats;
 
   const totalRevenue = visibleStats.reduce((s, p) => s + p.revenue, 0);
   const totalKg = visibleStats.reduce((s, p) => s + p.kgSold, 0);
@@ -873,64 +1008,162 @@ function ItemSalesTab() {
     const tRevenue = stats.reduce((s, p) => s + p.revenue, 0);
     const tKg = stats.reduce((s, p) => s + p.kgSold, 0);
     const tPcs = stats.reduce((s, p) => s + p.pcsSold, 0);
+    const totalOrders = stats.reduce((s, p) => s + p.orderCount, 0);
+
+    if (stats.length === 0) {
+      return (
+        <div className="rounded-xl border bg-card p-6">
+          <h3 className={`mb-4 text-lg font-semibold ${color}`}>{title}</h3>
+          <p className="text-sm text-muted-foreground">No sales data.</p>
+        </div>
+      );
+    }
+
+    // Mobile card view
+    const mobileCards = (
+      <div className="space-y-3 md:hidden">
+        {stats.map((ps, idx) => (
+          <div key={ps.name} className="rounded-xl border bg-card p-4">
+            <div className="flex items-start justify-between gap-3 mb-2">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-muted-foreground">#{idx + 1}</span>
+                  <span className="font-semibold text-base truncate">{ps.name}</span>
+                </div>
+                <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted font-medium">
+                    {ps.unit}
+                  </span>
+                  {ps.currentStock != null && (
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium ${
+                        ps.currentStock <= 0
+                          ? "bg-red-100 text-red-700"
+                          : "bg-green-100 text-green-700"
+                      }`}
+                    >
+                      Stock: {ps.currentStock}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 mb-3">
+              <div className="rounded-lg bg-primary/5 p-3 text-center">
+                <div className="text-[10px] font-medium text-primary uppercase tracking-wider">
+                  Kg Sold
+                </div>
+                <div className="text-lg font-bold text-primary">
+                  {ps.kgSold % 1 === 0 ? ps.kgSold.toFixed(0) : ps.kgSold.toFixed(1)}
+                </div>
+              </div>
+              <div className="rounded-lg bg-amber/5 p-3 text-center">
+                <div className="text-[10px] font-medium text-amber-700 uppercase tracking-wider">
+                  Pieces
+                </div>
+                <div className="text-lg font-bold text-amber-700">{ps.pcsSold || "-"}</div>
+              </div>
+              <div className="rounded-lg bg-green/5 p-3 text-center">
+                <div className="text-[10px] font-medium text-green-700 uppercase tracking-wider">
+                  Orders
+                </div>
+                <div className="text-lg font-bold text-green-700">{ps.orderCount}</div>
+              </div>
+            </div>
+
+            <div className="rounded-lg bg-muted/50 p-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-muted-foreground">Revenue</span>
+                <span className="text-lg font-bold text-primary">INR {Math.round(ps.revenue)}</span>
+              </div>
+              <div className="mt-1 text-xs text-muted-foreground">
+                Avg: INR{" "}
+                {ps.kgSold > 0
+                  ? Math.round(ps.revenue / ps.kgSold)
+                  : Math.round(ps.revenue / Math.max(ps.pcsSold, 1))}
+                /kg
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+
+    // Desktop table view
+    const desktopTable = (
+      <div className="hidden overflow-x-auto rounded-xl border bg-card md:block">
+        <table className="w-full text-sm">
+          <thead className="bg-muted text-left">
+            <tr>
+              <th className="p-2">#</th>
+              <th className="p-2">Product</th>
+              <th className="p-2">Unit</th>
+              <th className="p-2 text-right">Kg Sold</th>
+              <th className="p-2 text-right">Pcs</th>
+              <th className="p-2 text-right">Orders</th>
+              <th className="p-2 text-right">Revenue</th>
+              <th className="p-2 text-right">Avg Price</th>
+              <th className="p-2 text-right">Stock Left</th>
+            </tr>
+          </thead>
+          <tbody>
+            {stats.map((ps, idx) => (
+              <tr key={ps.name} className="border-t">
+                <td className="p-2 text-muted-foreground">{idx + 1}</td>
+                <td className="p-2 font-medium">{ps.name}</td>
+                <td className="p-2 capitalize">{ps.unit}</td>
+                <td className="p-2 text-right font-medium">
+                  {ps.kgSold % 1 === 0 ? ps.kgSold.toFixed(0) : ps.kgSold.toFixed(1)}
+                </td>
+                <td className="p-2 text-right">{ps.pcsSold || "-"}</td>
+                <td className="p-2 text-right">{ps.orderCount}</td>
+                <td className="p-2 text-right font-bold text-primary">
+                  INR {Math.round(ps.revenue)}
+                </td>
+                <td className="p-2 text-right">
+                  INR{" "}
+                  {ps.kgSold > 0
+                    ? Math.round(ps.revenue / ps.kgSold)
+                    : Math.round(ps.revenue / Math.max(ps.pcsSold, 1))}
+                  /kg
+                </td>
+                <td className="p-2 text-right">
+                  {ps.currentStock != null ? (
+                    <span
+                      className={ps.currentStock <= 0 ? "font-bold text-red-500" : "text-green-600"}
+                    >
+                      {ps.currentStock}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">-</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="border-t-2 bg-muted font-bold">
+              <td className="p-2" colSpan={3}>
+                Total
+              </td>
+              <td className="p-2 text-right">{tKg % 1 === 0 ? tKg.toFixed(0) : tKg.toFixed(1)}</td>
+              <td className="p-2 text-right">{tPcs || "-"}</td>
+              <td className="p-2 text-right">{totalOrders}</td>
+              <td className="p-2 text-right text-primary">INR {Math.round(tRevenue)}</td>
+              <td className="p-2 text-right">-</td>
+              <td className="p-2"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    );
+
     return (
       <div className="rounded-xl border bg-card p-6">
         <h3 className={`mb-4 text-lg font-semibold ${color}`}>{title}</h3>
-        {stats.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No sales data.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted text-left">
-                <tr>
-                  <th className="p-2">#</th>
-                  <th className="p-2">Product</th>
-                  <th className="p-2">Unit</th>
-                  <th className="p-2 text-right">Kg Sold</th>
-                  <th className="p-2 text-right">Pcs</th>
-                  <th className="p-2 text-right">Orders</th>
-                  <th className="p-2 text-right">Revenue</th>
-                  <th className="p-2 text-right">Avg Price</th>
-                  <th className="p-2 text-right">Stock Left</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stats.map((ps, idx) => (
-                  <tr key={ps.name} className="border-t">
-                    <td className="p-2 text-muted-foreground">{idx + 1}</td>
-                    <td className="p-2 font-medium">{ps.name}</td>
-                    <td className="p-2 capitalize">{ps.unit}</td>
-                    <td className="p-2 text-right font-medium">{ps.kgSold % 1 === 0 ? ps.kgSold.toFixed(0) : ps.kgSold.toFixed(1)}</td>
-                    <td className="p-2 text-right">{ps.pcsSold || "-"}</td>
-                    <td className="p-2 text-right">{ps.orderCount}</td>
-                    <td className="p-2 text-right font-bold text-primary">INR {Math.round(ps.revenue)}</td>
-                    <td className="p-2 text-right">INR {ps.kgSold > 0 ? Math.round(ps.revenue / ps.kgSold) : Math.round(ps.revenue / Math.max(ps.pcsSold, 1))}/kg</td>
-                    <td className="p-2 text-right">
-                      {ps.currentStock != null ? (
-                        <span className={ps.currentStock <= 0 ? "font-bold text-red-500" : "text-green-600"}>
-                          {ps.currentStock}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t-2 bg-muted font-bold">
-                  <td className="p-2" colSpan={3}>Total</td>
-                  <td className="p-2 text-right">{tKg % 1 === 0 ? tKg.toFixed(0) : tKg.toFixed(1)}</td>
-                  <td className="p-2 text-right">{tPcs || "-"}</td>
-                  <td className="p-2 text-right">{stats.reduce((s, p) => s + p.orderCount, 0)}</td>
-                  <td className="p-2 text-right text-primary">INR {Math.round(tRevenue)}</td>
-                  <td className="p-2 text-right">-</td>
-                  <td className="p-2"></td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        )}
+        {mobileCards}
+        {desktopTable}
       </div>
     );
   }
@@ -941,20 +1174,22 @@ function ItemSalesTab() {
       <div className="flex flex-wrap items-center gap-3">
         <DateCalendarPicker value={selectedDate} onChange={setSelectedDate} />
         <div className="flex gap-1 rounded-xl border bg-card p-1">
-          {([
+          {[
             { value: "all" as CategoryFilter, label: "All" },
             { value: "mutton" as CategoryFilter, label: "Mutton" },
             { value: "chicken" as CategoryFilter, label: "Chicken" },
-            { value: "other" as CategoryFilter, label: "Other" },
-          ]).map((c) => (
+            { value: "yabe" as CategoryFilter, label: "yabe" },
+          ].map((c) => (
             <button
               key={c.value}
               onClick={() => setCategory(c.value)}
               className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
                 category === c.value
-                  ? c.value === "mutton" ? "bg-red-600 text-white"
-                    : c.value === "chicken" ? "bg-amber-500 text-white"
-                    : "bg-primary text-primary-foreground"
+                  ? c.value === "mutton"
+                    ? "bg-red-600 text-white"
+                    : c.value === "chicken"
+                      ? "bg-amber-500 text-white"
+                      : "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -996,9 +1231,13 @@ function ItemSalesTab() {
             <span className="text-base font-semibold text-red-600">Mutton</span>
             <span className="text-xs text-muted-foreground">{muttonStats.length} products</span>
           </div>
-          <div className="mt-2 text-2xl font-bold text-red-600">INR {Math.round(muttonRevenue)}</div>
+          <div className="mt-2 text-2xl font-bold text-red-600">
+            INR {Math.round(muttonRevenue)}
+          </div>
           <div className="text-sm text-muted-foreground">
-            {muttonKg > 0 && <>{muttonKg % 1 === 0 ? muttonKg.toFixed(0) : muttonKg.toFixed(1)} kg</>}
+            {muttonKg > 0 && (
+              <>{muttonKg % 1 === 0 ? muttonKg.toFixed(0) : muttonKg.toFixed(1)} kg</>
+            )}
             {muttonKg > 0 && muttonPcs > 0 && <span className="mx-1">/</span>}
             {muttonPcs > 0 && <>{muttonPcs} pcs</>}
             {muttonKg === 0 && muttonPcs === 0 && "0 sold"}
@@ -1012,23 +1251,29 @@ function ItemSalesTab() {
             <span className="text-base font-semibold text-amber-600">Chicken</span>
             <span className="text-xs text-muted-foreground">{chickenStats.length} products</span>
           </div>
-          <div className="mt-2 text-2xl font-bold text-amber-600">INR {Math.round(chickenRevenue)}</div>
+          <div className="mt-2 text-2xl font-bold text-amber-600">
+            INR {Math.round(chickenRevenue)}
+          </div>
           <div className="text-sm text-muted-foreground">
-            {chickenKg > 0 && <>{chickenKg % 1 === 0 ? chickenKg.toFixed(0) : chickenKg.toFixed(1)} kg</>}
+            {chickenKg > 0 && (
+              <>{chickenKg % 1 === 0 ? chickenKg.toFixed(0) : chickenKg.toFixed(1)} kg</>
+            )}
             {chickenKg > 0 && chickenPcs > 0 && <span className="mx-1">/</span>}
             {chickenPcs > 0 && <>{chickenPcs} pcs</>}
             {chickenKg === 0 && chickenPcs === 0 && "0 sold"}
           </div>
         </div>
         <div
-          className={`rounded-xl border-2 p-6 cursor-pointer transition ${category === "other" ? "border-blue-500 bg-blue-50" : "border-border bg-card hover:border-blue-300"}`}
-          onClick={() => setCategory(category === "other" ? "all" : "other")}
+          className={`rounded-xl border-2 p-6 cursor-pointer transition ${category === "yabe" ? "border-blue-500 bg-blue-50" : "border-border bg-card hover:border-blue-300"}`}
+          onClick={() => setCategory(category === "yabe" ? "all" : "yabe")}
         >
           <div className="flex items-center justify-between">
             <span className="text-base font-semibold text-blue-600">Other</span>
             <span className="text-xs text-muted-foreground">{otherStats.length} products</span>
           </div>
-          <div className="mt-2 text-2xl font-bold text-blue-600">INR {Math.round(otherRevenue)}</div>
+          <div className="mt-2 text-2xl font-bold text-blue-600">
+            INR {Math.round(otherRevenue)}
+          </div>
           <div className="text-sm text-muted-foreground">
             {otherKg > 0 && <>{otherKg % 1 === 0 ? otherKg.toFixed(0) : otherKg.toFixed(1)} kg</>}
             {otherKg > 0 && otherPcs > 0 && <span className="mx-1">/</span>}
@@ -1044,7 +1289,9 @@ function ItemSalesTab() {
           <div className="flex items-center gap-2 text-base text-muted-foreground">
             <Package className="h-5 w-5" /> Kg Sold
           </div>
-          <div className="mt-2 text-3xl font-bold">{totalKg % 1 === 0 ? totalKg.toFixed(0) : totalKg.toFixed(1)}</div>
+          <div className="mt-2 text-3xl font-bold">
+            {totalKg % 1 === 0 ? totalKg.toFixed(0) : totalKg.toFixed(1)}
+          </div>
         </div>
         <div className="rounded-xl border bg-card p-6">
           <div className="flex items-center gap-2 text-base text-muted-foreground">
@@ -1070,7 +1317,8 @@ function ItemSalesTab() {
       {chartData.length > 0 && (
         <div className="rounded-xl border bg-card p-6">
           <h3 className="mb-4 text-lg font-semibold">
-            {category === "all" ? "All" : category.charAt(0).toUpperCase() + category.slice(1)} — Top Products by {sortBy === "revenue" ? "Revenue" : "Quantity"}
+            {category === "all" ? "All" : category.charAt(0).toUpperCase() + category.slice(1)} â€”
+            Top Products by {sortBy === "revenue" ? "Revenue" : "Quantity"}
           </h3>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
@@ -1081,7 +1329,13 @@ function ItemSalesTab() {
                 <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #e5e7eb" }} />
                 <Bar
                   dataKey={sortBy === "revenue" ? "revenue" : "kgSold"}
-                  fill={category === "mutton" ? "#e11d48" : category === "chicken" ? "#f59e0b" : "#2563eb"}
+                  fill={
+                    category === "mutton"
+                      ? "#e11d48"
+                      : category === "chicken"
+                        ? "#f59e0b"
+                        : "#2563eb"
+                  }
                   radius={[0, 6, 6, 0]}
                   name={sortBy === "revenue" ? "Revenue (INR)" : "Kg Sold"}
                 />
@@ -1091,7 +1345,7 @@ function ItemSalesTab() {
         </div>
       )}
 
-      {/* Tables — show split or combined */}
+      {/* Tables â€” show split or combined */}
       {category === "all" ? (
         <>
           {muttonStats.length > 0 && renderTable(muttonStats, "Mutton Items", "text-red-600")}
@@ -1099,7 +1353,11 @@ function ItemSalesTab() {
           {otherStats.length > 0 && renderTable(otherStats, "Other Items", "text-blue-600")}
         </>
       ) : (
-        renderTable(visibleStats, `${category.charAt(0).toUpperCase() + category.slice(1)} Items`, "")
+        renderTable(
+          visibleStats,
+          `${category.charAt(0).toUpperCase() + category.slice(1)} Items`,
+          "",
+        )
       )}
     </div>
   );
@@ -1194,7 +1452,7 @@ function OrdersTab() {
     staleTime: 30_000,
   });
 
-  // Buzzer sound for new orders — try Web Audio API, fallback to HTMLAudioElement
+  // Buzzer sound for new orders - try Web Audio API, fallback to HTMLAudioElement
   const audioCtxRef = useRef<AudioContext | null>(null);
   const buzzerBufferRef = useRef<AudioBuffer | null>(null);
   const fallbackAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -1217,8 +1475,7 @@ function OrdersTab() {
             })
             .catch(() => {});
         }
-        const fallback = new Audio();
-        fallback.src = URL.createObjectURL(new Blob([buf], { type: "audio/mpeg" }));
+        const fallback = new Audio("/buzzer.mp3");
         fallback.load();
         fallbackAudioRef.current = fallback;
       } catch {
@@ -1238,6 +1495,10 @@ function OrdersTab() {
     return () => {
       document.removeEventListener("click", unlock);
       document.removeEventListener("touchstart", unlock);
+      audioCtxRef.current?.close().catch(() => {});
+      audioCtxRef.current = null;
+      fallbackAudioRef.current?.pause();
+      fallbackAudioRef.current = null;
     };
   }, []);
 
@@ -1394,11 +1655,16 @@ function OrdersTab() {
 
   const downloadOrdersCSV = () => {
     const rows: string[] = [];
-    rows.push("Order ID,Date,Customer Name,Flat,Phone,Alt Phone,Community,Block,Packing Note,Items,Total");
+    rows.push(
+      "Order ID,Date,Customer Name,Flat,Phone,Alt Phone,Community,Block,Packing Note,Items,Total",
+    );
     for (const o of allOrders) {
       const oItems = items.filter((i) => i.order_id === o.id);
       const itemsStr = oItems
-        .map((it) => `${it.product_name} ${it.unit} x${it.quantity} INR${Math.round(Number(it.price) * Number(it.quantity))}`)
+        .map(
+          (it) =>
+            `${it.product_name} ${it.unit} x${it.quantity} INR${Math.round(Number(it.price) * Number(it.quantity))}`,
+        )
         .join(" | ");
       const date = new Date(o.created_at).toLocaleString();
       const escape = (s: string) => `"${(s || "").replace(/"/g, '""')}"`;
@@ -1423,8 +1689,11 @@ function OrdersTab() {
     const a = document.createElement("a");
     a.href = url;
     a.download = `orders_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.style.display = "none";
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   if (isLoading)
@@ -1456,7 +1725,10 @@ function OrdersTab() {
 
   const totalPages = Math.ceil(dateFilteredOrders.length / ORDERS_PER_PAGE);
   const currentPage = Math.min(page, Math.max(0, totalPages - 1));
-  const paginatedOrders = dateFilteredOrders.slice(currentPage * ORDERS_PER_PAGE, (currentPage + 1) * ORDERS_PER_PAGE);
+  const paginatedOrders = dateFilteredOrders.slice(
+    currentPage * ORDERS_PER_PAGE,
+    (currentPage + 1) * ORDERS_PER_PAGE,
+  );
 
   let printOrders: Order[] = [];
   let printTitle = "";
@@ -1527,32 +1799,32 @@ function OrdersTab() {
         <div className="no-print mb-6 rounded-lg border bg-card p-4">
           <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-lg font-semibold">{selectedCommunity.name}</h2>
-              <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <button
+                onClick={() =>
+                  doPrint("a4", { kind: "community", communityName: selectedCommunity.name })
+                }
+                className="flex items-center justify-center gap-1 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
+              >
+                <Printer className="h-4 w-4" /> A4
+              </button>
+              <button
+                onClick={() =>
+                  doPrint("thermal", { kind: "community", communityName: selectedCommunity.name })
+                }
+                className="flex items-center justify-center gap-1 rounded-md bg-secondary px-3 py-2 text-sm font-medium"
+              >
+                <Receipt className="h-4 w-4" /> Thermal (80mm)
+              </button>
+              {isPrinterConnected() && (
                 <button
-                  onClick={() =>
-                    doPrint("a4", { kind: "community", communityName: selectedCommunity.name })
-                  }
-                  className="flex items-center justify-center gap-1 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
+                  onClick={() => doBtPrintBatch(communityOrders)}
+                  className="flex items-center justify-center gap-1 rounded-md bg-green-700 px-3 py-2 text-sm font-medium text-white"
                 >
-                  <Printer className="h-4 w-4" /> A4
+                  <Bluetooth className="h-4 w-4" /> BT Batch
                 </button>
-                <button
-                  onClick={() =>
-                    doPrint("thermal", { kind: "community", communityName: selectedCommunity.name })
-                  }
-                  className="flex items-center justify-center gap-1 rounded-md bg-secondary px-3 py-2 text-sm font-medium"
-                >
-                  <Receipt className="h-4 w-4" /> Thermal (80mm)
-                </button>
-                {isPrinterConnected() && (
-                  <button
-                    onClick={() => doBtPrintBatch(communityOrders)}
-                    className="flex items-center justify-center gap-1 rounded-md bg-green-700 px-3 py-2 text-sm font-medium text-white"
-                  >
-                    <Bluetooth className="h-4 w-4" /> BT Batch
-                  </button>
-                )}
-              </div>
+              )}
+            </div>
           </div>
 
           {blocks.length === 0 && (
@@ -1826,7 +2098,9 @@ function OrdersTab() {
                   <td className="p-3">{o.alt_phone || "-"}</td>
                   <td className="p-3">{o.community_name}</td>
                   <td className="p-3">{o.block_name}</td>
-                  <td className="p-3 text-right font-semibold">INR {Math.round(Number(o.total))}</td>
+                  <td className="p-3 text-right font-semibold">
+                    INR {Math.round(Number(o.total))}
+                  </td>
                   <td className="p-3 text-right">
                     <div className="flex justify-end gap-2">
                       {isPrinterConnected() && (
@@ -1884,7 +2158,10 @@ function PrintSheet({
   const grandTotal = Math.round(orders.reduce((s, o) => s + Number(o.total), 0));
 
   return (
-    <div className="print-page a4-only bg-white p-6 text-black" style={{ border: "none", borderRadius: 0 }}>
+    <div
+      className="print-page a4-only bg-white p-6 text-black"
+      style={{ border: "none", borderRadius: 0 }}
+    >
       <div className="mb-4 flex items-center gap-4 border-b-2 border-black pb-3">
         <img src="/MM.jpeg" alt="Logo" className="h-14 w-14 object-contain" />
         <div>
@@ -1892,7 +2169,9 @@ function PrintSheet({
             Manapalle
             <span className="block text-sm font-medium">Mutton & Chicken</span>
           </h1>
-          <p className="mt-1 text-xs text-gray-500">Fresh from the Village, Straight to Your Home — 9030901233</p>
+          <p className="mt-1 text-xs text-gray-500">
+            Fresh from the Village, Straight to Your Home â€” 9030901233
+          </p>
           <p className="mt-1 text-sm font-bold">{title}</p>
           <p className="text-[10px] text-gray-600">Printed: {new Date().toLocaleString()}</p>
         </div>
@@ -1906,19 +2185,25 @@ function PrintSheet({
         return (
           <div key={blockName} className="mb-5 avoid-break">
             <h2 className="mb-1.5 border-b-2 border-black px-2 py-0.5 text-sm font-bold bg-gray-100">
-              Block {blockName} &mdash; {blockOrders.length} order{blockOrders.length !== 1 ? "s" : ""}
+              Block {blockName} &mdash; {blockOrders.length} order
+              {blockOrders.length !== 1 ? "s" : ""}
             </h2>
-              {blockOrders.map((o) => {
+            {blockOrders.map((o) => {
               const oItems = items.filter((i) => i.order_id === o.id);
               const showAlt = o.alt_phone && o.alt_phone !== o.phone;
               return (
-                <div key={o.id} className="mb-3 avoid-break border border-gray-400 p-2 text-xs" style={{ borderRadius: 0 }}>
+                <div
+                  key={o.id}
+                  className="mb-3 avoid-break border border-gray-400 p-2 text-xs"
+                  style={{ borderRadius: 0 }}
+                >
                   <div className="flex items-baseline justify-between gap-2 border-b border-gray-300 pb-1 font-semibold">
                     <span className="truncate">
                       {o.order_number} &mdash; {o.customer_name}, {o.flat_no || "-"}
                     </span>
                     <span className="whitespace-nowrap text-[10px] text-gray-600">
-                      {o.phone}{showAlt ? ` / ${o.alt_phone}` : ""}
+                      {o.phone}
+                      {showAlt ? ` / ${o.alt_phone}` : ""}
                     </span>
                   </div>
                   {o.packing_note && (
@@ -1963,7 +2248,9 @@ function PrintSheet({
         );
       })}
       <div className="flex justify-between border-t-4 border-double border-black px-2 py-1 text-sm font-bold">
-        <span>GRAND TOTAL &mdash; {orders.length} order{orders.length !== 1 ? "s" : ""}</span>
+        <span>
+          GRAND TOTAL &mdash; {orders.length} order{orders.length !== 1 ? "s" : ""}
+        </span>
         <span>INR {grandTotal}</span>
       </div>
     </div>
@@ -1997,13 +2284,16 @@ function ThermalSheet({
               const oItems = items.filter((i) => i.order_id === o.id);
               const showAlt = o.alt_phone && o.alt_phone !== o.phone;
               return (
-                <div key={o.id} className={"thermal-order" + (idx < bOrders.length - 1 ? " thermal-page" : "")}>
+                <div
+                  key={o.id}
+                  className={"thermal-order" + (idx < bOrders.length - 1 ? " thermal-page" : "")}
+                >
                   <div className="thermal-receipt">
                     <div style={{ textAlign: "center" }}>
                       <img src="/MM.jpeg" alt="Logo" style={{ height: 48, margin: "0 auto" }} />
                     </div>
                     <h1 style={{ textAlign: "center", fontSize: 16, letterSpacing: 1 }}>
-                      MANAPALLE MUTTON
+                      MANAPALLE PRODUCTS
                     </h1>
                     <div style={{ textAlign: "center", fontSize: 10, marginBottom: "2mm" }}>
                       {new Date(o.created_at).toLocaleString()}
@@ -2027,16 +2317,29 @@ function ThermalSheet({
                       {o.community_name} / Block {o.block_name}
                     </div>
                     {o.packing_note && (
-                      <div style={{ fontSize: 11, fontWeight: 800, marginTop: "1mm", marginBottom: "1mm" }}>
+                      <div
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 800,
+                          marginTop: "1mm",
+                          marginBottom: "1mm",
+                        }}
+                      >
                         Note: {o.packing_note}
                       </div>
                     )}
                     <table style={{ marginTop: "1mm" }}>
                       <thead>
                         <tr style={{ borderBottom: "1px dashed #000" }}>
-                          <th style={{ fontSize: 11, textAlign: "left", paddingBottom: "0.5mm" }}>Item</th>
-                          <th style={{ fontSize: 11, textAlign: "center", paddingBottom: "0.5mm" }}>Qty</th>
-                          <th style={{ fontSize: 11, textAlign: "right", paddingBottom: "0.5mm" }}>Amt</th>
+                          <th style={{ fontSize: 11, textAlign: "left", paddingBottom: "0.5mm" }}>
+                            Item
+                          </th>
+                          <th style={{ fontSize: 11, textAlign: "center", paddingBottom: "0.5mm" }}>
+                            Qty
+                          </th>
+                          <th style={{ fontSize: 11, textAlign: "right", paddingBottom: "0.5mm" }}>
+                            Amt
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2045,8 +2348,12 @@ function ThermalSheet({
                           const qtyDisplay = it.unit + " x" + it.quantity;
                           return (
                             <tr key={it.id}>
-                              <td style={{ fontSize: 11, paddingTop: "0.5mm" }}>{it.product_name}</td>
-                              <td style={{ textAlign: "center", fontSize: 11, paddingTop: "0.5mm" }}>
+                              <td style={{ fontSize: 11, paddingTop: "0.5mm" }}>
+                                {it.product_name}
+                              </td>
+                              <td
+                                style={{ textAlign: "center", fontSize: 11, paddingTop: "0.5mm" }}
+                              >
                                 {qtyDisplay}
                               </td>
                               <td style={{ textAlign: "right", fontSize: 11, paddingTop: "0.5mm" }}>
@@ -2103,13 +2410,15 @@ function ThermalSheet({
                   </div>
                   <div className="divider-solid" />
                   <div style={{ textAlign: "center", fontWeight: 800, fontSize: 13 }}>
-                    {title} — {blockName ? `Block ${blockName}` : ""}
+                    {title} â€” {blockName ? `Block ${blockName}` : ""}
                   </div>
                   <div style={{ fontSize: 11 }}>Orders: {bOrders.length}</div>
                   <div className="divider-solid" />
                   {bOrders.map((o) => (
                     <div key={o.id} className="row" style={{ fontSize: 11, marginBottom: "0.5mm" }}>
-                      <span>{o.customer_name} — {o.order_number}</span>
+                      <span>
+                        {o.customer_name} â€” {o.order_number}
+                      </span>
                       <span>INR {Math.round(Number(o.total))}</span>
                     </div>
                   ))}
@@ -2138,13 +2447,16 @@ function ProductsTab() {
   const [category, setCategory] = useState("mutton");
   const [imageUrl, setImageUrl] = useState("");
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [filterCategory, setFilterCategory] = useState<string>("all");
+  const [newPriority, setNewPriority] = useState("");
 
   const { data: products = [], isLoading } = useQuery<Product[]>({
     queryKey: ["admin", "products"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, unit, price, image_url, active, category, created_at, stock")
+        .select("id, name, unit, price, image_url, active, category, created_at, stock, priority")
+        .order("priority", { ascending: true, nullsFirst: false })
         .order("name");
       if (error) {
         console.error("Failed to load products:", error);
@@ -2154,6 +2466,40 @@ function ProductsTab() {
     },
     staleTime: 300_000,
   });
+
+  const { data: categories = [] } = useQuery<Category[]>({
+    queryKey: ["admin", "categories"],
+    queryFn: async () => {
+      const { data, error } = await categoryQueryClient
+        .from("categories")
+        .select("id, name, slug, priority");
+      if (error) {
+        console.error("Failed to load product categories:", error);
+        return [];
+      }
+      return ((data as unknown as Category[]) || []).sort(
+        (a, b) => (a.priority ?? Number.MAX_SAFE_INTEGER) - (b.priority ?? Number.MAX_SAFE_INTEGER) || a.name.localeCompare(b.name),
+      );
+    },
+    staleTime: 300_000,
+  });
+
+  const filteredProducts =
+    filterCategory === "all" ? products : products.filter((p) => p.category === filterCategory);
+
+  const categoryOptions =
+    categories.length > 0
+      ? categories.map((item) => ({ slug: item.slug, name: item.name }))
+      : ["mutton", "chicken", "fish", "prawns", "eggs"].map((slug) => ({
+          slug,
+          name: slug.charAt(0).toUpperCase() + slug.slice(1),
+        }));
+
+  useEffect(() => {
+    if (categories.length > 0 && !categories.some((item) => item.slug === category)) {
+      setCategory(categories[0].slug);
+    }
+  }, [categories, category]);
 
   useEffect(() => {
     const channel = supabase
@@ -2177,6 +2523,7 @@ function ProductsTab() {
           stock: stock || null,
           image_url: imageUrl.trim() || null,
           category,
+          priority: newPriority !== "" ? Number(newPriority) : null,
         },
       });
     },
@@ -2186,6 +2533,7 @@ function ProductsTab() {
       setStock("");
       setCategory("mutton");
       setImageUrl("");
+      setNewPriority("");
       queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
       queryClient.invalidateQueries({ queryKey: ["products", "active"] });
     },
@@ -2225,6 +2573,7 @@ function ProductsTab() {
         active?: boolean;
         category?: string;
         image_url?: string | null;
+        priority?: number | null;
       };
     }) => {
       await adminUpdateProduct({ data: { id, updates } });
@@ -2330,7 +2679,7 @@ function ProductsTab() {
     <div>
       <form
         onSubmit={add}
-        className="mb-5 grid gap-3 rounded-xl border bg-card p-4 sm:p-6 sm:grid-cols-2 lg:grid-cols-7"
+        className="mb-5 grid gap-3 rounded-xl border bg-card p-4 sm:p-6 sm:grid-cols-2 lg:grid-cols-8"
       >
         <input
           value={name}
@@ -2338,30 +2687,27 @@ function ProductsTab() {
           placeholder="Product name"
           className="rounded-xl border bg-background px-4 py-4 text-base"
         />
-        <select
+          <select
           value={category}
           onChange={(e) => setCategory(e.target.value)}
           className="rounded-xl border bg-background px-4 py-4 text-base"
-        >
-          <option value="mutton">Mutton</option>
-          <option value="chicken">Chicken</option>
-          <option value="fish">Fish</option>
-          <option value="prawns">Prawns</option>
-          <option value="eggs">Eggs</option>
-          <option value="other">Other</option>
-        </select>
+          >
+            {categoryOptions.map((item) => (
+              <option key={item.slug} value={item.slug}>
+                {item.name}
+              </option>
+            ))}
+          </select>
         <select
           value={unit}
           onChange={(e) => setUnit(e.target.value)}
           className="rounded-xl border bg-background px-4 py-4 text-base"
         >
-              <option value="kg">kg</option>
-              <option value="500g">500g</option>
-              <option value="750g">750g</option>
-              <option value="dozen">dozen</option>
-              <option value="piece">piece</option>
-              <option value="tray">Tray (30)</option>
-            </select>
+          <option value="kg">kg</option>
+          <option value="dozen">dozen</option>
+          <option value="piece">piece</option>
+          <option value="tray">Tray (30)</option>
+        </select>
         <input
           value={price}
           onChange={(e) => setPrice(e.target.value)}
@@ -2375,6 +2721,14 @@ function ProductsTab() {
           placeholder="Stock (empty = unlimited)"
           type="text"
           inputMode="decimal"
+          className="rounded-xl border bg-background px-4 py-4 text-base"
+        />
+        <input
+          value={newPriority}
+          onChange={(e) => setNewPriority(e.target.value)}
+          placeholder="Priority (1 = first)"
+          type="number"
+          min="1"
           className="rounded-xl border bg-background px-4 py-4 text-base"
         />
         <input
@@ -2392,6 +2746,23 @@ function ProductsTab() {
         </button>
       </form>
 
+      {/* Category Filter Tabs */}
+      <div className="mb-4 flex flex-wrap gap-2">
+        {[{ slug: "all", name: "All" }, ...categoryOptions].map((item) => (
+          <button
+            key={item.slug}
+            onClick={() => setFilterCategory(item.slug)}
+            className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+              filterCategory === item.slug
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground hover:bg-muted/80"
+            }`}
+          >
+            {item.name}
+          </button>
+        ))}
+      </div>
+
       {/* Desktop Table */}
       <div className="hidden overflow-x-auto rounded-xl border bg-card md:block">
         <table className="w-full text-base">
@@ -2403,60 +2774,157 @@ function ProductsTab() {
               <th className="p-3">Unit</th>
               <th className="p-3">Price</th>
               <th className="p-3">Stock</th>
+              <th className="p-3">Priority</th>
               <th className="p-3">Active</th>
               <th className="p-3">Image Options</th>
               <th className="p-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {products.map((p) => (
+            {filteredProducts.map((p) => (
               <tr key={p.id} className="border-t">
                 <td className="p-3">
                   {p.image_url ? (
-                    <img src={p.image_url} alt={p.name} className="h-14 w-14 rounded-xl object-cover border shadow-sm" />
+                    <img
+                      src={p.image_url}
+                      alt={p.name}
+                      className="h-14 w-14 rounded-xl object-cover border shadow-sm"
+                    />
                   ) : (
-                    <div className="flex h-14 w-14 items-center justify-center rounded-xl border bg-muted text-xs text-muted-foreground">No Image</div>
+                    <div className="flex h-14 w-14 items-center justify-center rounded-xl border bg-muted text-xs text-muted-foreground">
+                      No Image
+                    </div>
                   )}
                 </td>
                 <td className="p-3">
-                  <input defaultValue={p.name} onBlur={(e) => updateName(p, e.target.value)} className="w-full min-w-[120px] rounded-xl border bg-background px-3 py-2 text-base" />
+                  <input
+                    defaultValue={p.name}
+                    onBlur={(e) => updateName(p, e.target.value)}
+                    className="w-full min-w-[120px] rounded-xl border bg-background px-3 py-2 text-base"
+                  />
                 </td>
                 <td className="p-3">
-                  <select defaultValue={p.category} onChange={(e) => updateProductMutation.mutate({ id: p.id, updates: { category: e.target.value } })} className="rounded-xl border bg-background px-3 py-2 text-base">
-                    <option value="mutton">Mutton</option><option value="chicken">Chicken</option><option value="fish">Fish</option><option value="prawns">Prawns</option><option value="eggs">Eggs</option><option value="other">Other</option>
+                  <select
+                    defaultValue={p.category}
+                    onChange={(e) =>
+                      updateProductMutation.mutate({
+                        id: p.id,
+                        updates: { category: e.target.value },
+                      })
+                    }
+                    className="rounded-xl border bg-background px-3 py-2 text-base"
+                  >
+                    {categoryOptions.map((item) => (
+                      <option key={item.slug} value={item.slug}>
+                        {item.name}
+                      </option>
+                    ))}
                   </select>
                 </td>
                 <td className="p-3">
-                  <select defaultValue={p.unit} onChange={(e) => updateUnit(p, e.target.value)} className="rounded-xl border bg-background px-3 py-2 text-base">
-                    <option value="kg">kg</option><option value="500g">500g</option><option value="750g">750g</option><option value="dozen">dozen</option><option value="piece">piece</option><option value="tray">Tray (30)</option>
+                  <select
+                    defaultValue={p.unit}
+                    onChange={(e) => updateUnit(p, e.target.value)}
+                    className="rounded-xl border bg-background px-3 py-2 text-base"
+                  >
+                    <option value="kg">kg</option>
+                    <option value="dozen">dozen</option>
+                    <option value="piece">piece</option>
+                    <option value="tray">Tray (30)</option>
                   </select>
                 </td>
                 <td className="p-3">
-                  <input defaultValue={p.price} onBlur={(e) => updatePrice(p, e.target.value)} type="number" className="w-28 rounded-xl border bg-background px-3 py-2 text-base" />
+                  <input
+                    defaultValue={p.price}
+                    onBlur={(e) => updatePrice(p, e.target.value)}
+                    type="number"
+                    className="w-28 rounded-xl border bg-background px-3 py-2 text-base"
+                  />
                 </td>
                 <td className="p-3">
-                  <input defaultValue={p.stock ?? ""} onBlur={(e) => { const v = e.target.value.trim(); if (v === "" || v === p.stock?.toString()) return; const num = Number(v); if (v !== "" && (isNaN(num) || num < 0)) return; updateProductMutation.mutate({ id: p.id, updates: { stock: v === "" ? null : num } }); }} placeholder="Unlimited" type="text" inputMode="decimal" className="w-28 rounded-xl border bg-background px-3 py-2 text-base" />
+                  <input
+                    defaultValue={p.stock ?? ""}
+                    onBlur={(e) => {
+                      const v = e.target.value.trim();
+                      if (v === "" || v === p.stock?.toString()) return;
+                      const num = Number(v);
+                      if (v !== "" && (isNaN(num) || num < 0)) return;
+                      updateProductMutation.mutate({
+                        id: p.id,
+                        updates: { stock: v === "" ? null : num },
+                      });
+                    }}
+                    placeholder="Unlimited"
+                    type="text"
+                    inputMode="decimal"
+                    className="w-28 rounded-xl border bg-background px-3 py-2 text-base"
+                  />
                 </td>
                 <td className="p-3">
-                  <button onClick={() => toggle(p)} className={`rounded-xl px-4 py-2 text-sm font-semibold ${p.active ? "bg-green-100 text-green-800" : "bg-gray-200 text-gray-700"}`}>
+                  <input
+                    defaultValue={p.priority ?? ""}
+                    onBlur={(e) => {
+                      const v = e.target.value.trim();
+                      if (v === "" || v === (p.priority?.toString() ?? "")) return;
+                      const num = Number(v);
+                      if (v !== "" && (isNaN(num) || num < 1)) return;
+                      updateProductMutation.mutate({
+                        id: p.id,
+                        updates: { priority: v === "" ? null : num },
+                      });
+                    }}
+                    placeholder="-"
+                    type="number"
+                    min="1"
+                    className="w-20 rounded-xl border bg-background px-3 py-2 text-base"
+                  />
+                </td>
+                <td className="p-3">
+                  <button
+                    onClick={() => toggle(p)}
+                    className={`rounded-xl px-4 py-2 text-sm font-semibold ${p.active ? "bg-green-100 text-green-800" : "bg-gray-200 text-gray-700"}`}
+                  >
                     {p.active ? "Active" : "Inactive"}
                   </button>
                 </td>
                 <td className="p-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <input type="file" accept="image/*" className="hidden" id={`image-upload-${p.id}`} onChange={(e) => { const file = e.target.files?.[0]; if (file) handleFileUpload(p, file); }} />
-                    <label htmlFor={`image-upload-${p.id}`} className="cursor-pointer rounded-xl border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      id={`image-upload-${p.id}`}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleFileUpload(p, file);
+                      }}
+                    />
+                    <label
+                      htmlFor={`image-upload-${p.id}`}
+                      className="cursor-pointer rounded-xl border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
+                    >
                       {uploadingId === p.id ? "Uploading..." : "Upload File"}
                     </label>
                     {p.image_url && (
-                      <button onClick={() => removeImageMutation.mutate({ productId: p.id, imageUrl: p.image_url! })} disabled={removeImageMutation.isPending} className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 hover:bg-red-100 disabled:opacity-50">
+                      <button
+                        onClick={() =>
+                          removeImageMutation.mutate({ productId: p.id, imageUrl: p.image_url! })
+                        }
+                        disabled={removeImageMutation.isPending}
+                        className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 hover:bg-red-100 disabled:opacity-50"
+                      >
                         {removeImageMutation.isPending ? "Removing..." : "Remove Image"}
                       </button>
                     )}
                   </div>
                 </td>
                 <td className="p-3 text-right">
-                  <button onClick={() => del(p)} className="text-destructive hover:underline text-sm font-medium px-2 py-2">Delete</button>
+                  <button
+                    onClick={() => del(p)}
+                    className="text-destructive hover:underline text-sm font-medium px-2 py-2"
+                  >
+                    Delete
+                  </button>
                 </td>
               </tr>
             ))}
@@ -2466,46 +2934,396 @@ function ProductsTab() {
 
       {/* Mobile Cards */}
       <div className="space-y-3 md:hidden">
-        {products.map((p) => (
-          <div key={p.id} className="rounded-xl border bg-card p-4">
-            <div className="flex gap-3">
+        {filteredProducts.map((p) => (
+          <div key={p.id} className="rounded-xl border bg-card p-4 shadow-sm">
+            {/* Product Header with Image and Name */}
+            <div className="flex items-start gap-3 mb-3">
               {p.image_url ? (
-                <img src={p.image_url} alt={p.name} className="h-16 w-16 shrink-0 rounded-xl object-cover border shadow-sm" />
+                <img
+                  src={p.image_url}
+                  alt={p.name}
+                  className="h-20 w-20 shrink-0 rounded-xl object-cover border shadow-sm"
+                />
               ) : (
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border bg-muted text-xs text-muted-foreground">No Image</div>
+                <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl border bg-muted text-xs text-muted-foreground">
+                  No Image
+                </div>
               )}
               <div className="min-w-0 flex-1">
-                <input defaultValue={p.name} onBlur={(e) => updateName(p, e.target.value)} className="w-full rounded-lg border bg-background px-3 py-1.5 text-sm font-medium" />
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <select defaultValue={p.category} onChange={(e) => updateProductMutation.mutate({ id: p.id, updates: { category: e.target.value } })} className="rounded-lg border bg-background px-2 py-1 text-xs">
-                    <option value="mutton">Mutton</option><option value="chicken">Chicken</option><option value="fish">Fish</option><option value="prawns">Prawns</option><option value="eggs">Eggs</option><option value="other">Other</option>
-                  </select>
-                  <select defaultValue={p.unit} onChange={(e) => updateUnit(p, e.target.value)} className="rounded-lg border bg-background px-2 py-1 text-xs">
-                    <option value="kg">kg</option><option value="500g">500g</option><option value="750g">750g</option><option value="dozen">dozen</option><option value="piece">piece</option><option value="tray">Tray (30)</option>
-                  </select>
-                  <input defaultValue={p.price} onBlur={(e) => updatePrice(p, e.target.value)} type="number" className="w-20 rounded-lg border bg-background px-2 py-1 text-xs" placeholder="Price" />
-                  <input defaultValue={p.stock ?? ""} onBlur={(e) => { const v = e.target.value.trim(); if (v === "" || v === p.stock?.toString()) return; const num = Number(v); if (v !== "" && (isNaN(num) || num < 0)) return; updateProductMutation.mutate({ id: p.id, updates: { stock: v === "" ? null : num } }); }} placeholder="Stock" type="text" inputMode="decimal" className="w-20 rounded-lg border bg-background px-2 py-1 text-xs" />
+                <input
+                  defaultValue={p.name}
+                  onBlur={(e) => updateName(p, e.target.value)}
+                  className="w-full rounded-lg border bg-background px-3 py-2 text-base font-semibold"
+                />
+                <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
+                    {p.category.charAt(0).toUpperCase() + p.category.slice(1)}
+                  </span>
+                  {p.priority && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber/10 text-amber-700 font-medium">
+                      Priority: {p.priority}
+                    </span>
+                  )}
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">
+                    {p.unit}
+                  </span>
                 </div>
               </div>
             </div>
-            <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
-              <button onClick={() => toggle(p)} className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${p.active ? "bg-green-100 text-green-800" : "bg-gray-200 text-gray-700"}`}>
+
+            {/* Price & Stock Row */}
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div className="rounded-lg bg-muted/50 p-3">
+                <label className="block text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1">
+                  Price (INR)
+                </label>
+                <input
+                  defaultValue={p.price}
+                  onBlur={(e) => updatePrice(p, e.target.value)}
+                  type="number"
+                  className="w-full rounded bg-background px-2 py-1.5 text-base font-medium text-right"
+                  placeholder="0"
+                />
+              </div>
+              <div className="rounded-lg bg-muted/50 p-3">
+                <label className="block text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1">
+                  Stock
+                </label>
+                <input
+                  defaultValue={p.stock ?? ""}
+                  onBlur={(e) => {
+                    const v = e.target.value.trim();
+                    if (v === "" || v === p.stock?.toString()) return;
+                    const num = Number(v);
+                    if (v !== "" && (isNaN(num) || num < 0)) return;
+                    updateProductMutation.mutate({
+                      id: p.id,
+                      updates: { stock: v === "" ? null : num },
+                    });
+                  }}
+                  placeholder="Unlimited"
+                  type="text"
+                  inputMode="decimal"
+                  className="w-full rounded bg-background px-2 py-1.5 text-base font-medium text-right"
+                />
+              </div>
+            </div>
+
+            {/* Priority Row */}
+            <div className="rounded-lg bg-muted/50 p-3 mb-3">
+              <label className="block text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1">
+                Display Priority (1 = First)
+              </label>
+              <input
+                defaultValue={p.priority ?? ""}
+                onBlur={(e) => {
+                  const v = e.target.value.trim();
+                  if (v === "" || v === (p.priority?.toString() ?? "")) return;
+                  const num = Number(v);
+                  if (v !== "" && (isNaN(num) || num < 1)) return;
+                  updateProductMutation.mutate({
+                    id: p.id,
+                    updates: { priority: v === "" ? null : num },
+                  });
+                }}
+                placeholder="Auto"
+                type="number"
+                min="1"
+                className="w-full rounded bg-background px-2 py-1.5 text-base font-medium text-center"
+              />
+            </div>
+
+            {/* Category Selector */}
+            <div className="mb-3">
+              <label className="block text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1">
+                Category
+              </label>
+              <select
+                defaultValue={p.category}
+                onChange={(e) =>
+                  updateProductMutation.mutate({ id: p.id, updates: { category: e.target.value } })
+                }
+                className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+              >
+                {categoryOptions.map((item) => (
+                  <option key={item.slug} value={item.slug}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Image Upload */}
+            <div className="mb-3">
+              <label className="block text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1">
+                Product Image
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  id={`image-upload-m-${p.id}`}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleFileUpload(p, file);
+                  }}
+                />
+                <label
+                  htmlFor={`image-upload-m-${p.id}`}
+                  className="flex-1 cursor-pointer rounded-lg border bg-background px-3 py-2 text-sm font-medium text-center hover:bg-muted transition"
+                >
+                  {uploadingId === p.id
+                    ? "Uploading..."
+                    : p.image_url
+                      ? "Change Image"
+                      : "Upload Image"}
+                </label>
+                {p.image_url && (
+                  <button
+                    onClick={() =>
+                      removeImageMutation.mutate({ productId: p.id, imageUrl: p.image_url! })
+                    }
+                    disabled={removeImageMutation.isPending}
+                    className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 hover:bg-red-100 disabled:opacity-50 flex items-center gap-1"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                    Remove
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap gap-2 border-t pt-3">
+              <button
+                onClick={() => toggle(p)}
+                className={`flex-1 min-w-[100px] rounded-lg px-3 py-2 text-sm font-semibold ${p.active ? "bg-green-100 text-green-800" : "bg-gray-200 text-gray-700"}`}
+              >
                 {p.active ? "Active" : "Inactive"}
               </button>
-              <input type="file" accept="image/*" className="hidden" id={`image-upload-m-${p.id}`} onChange={(e) => { const file = e.target.files?.[0]; if (file) handleFileUpload(p, file); }} />
-              <label htmlFor={`image-upload-m-${p.id}`} className="cursor-pointer rounded-lg border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted">
-                {uploadingId === p.id ? "Uploading..." : "Image"}
-              </label>
-              {p.image_url && (
-                <button onClick={() => removeImageMutation.mutate({ productId: p.id, imageUrl: p.image_url! })} disabled={removeImageMutation.isPending} className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs text-red-700 disabled:opacity-50">
-                  Remove
-                </button>
-              )}
-              <button onClick={() => del(p)} className="ml-auto text-destructive text-xs font-medium px-2 py-1.5">Delete</button>
+              <button
+                onClick={() => del(p)}
+                className="flex-1 min-w-[100px] rounded-lg bg-red-100 text-red-700 px-3 py-2 text-sm font-semibold"
+              >
+                Delete
+              </button>
             </div>
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/* ---------------- Categories ---------------- */
+function CategoriesTab() {
+  const queryClient = useQueryClient();
+  const [name, setName] = useState("");
+  const [priority, setPriority] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
+
+  const { data: categories = [], isLoading } = useQuery<Category[]>({
+    queryKey: ["admin", "categories"],
+    queryFn: async () => {
+      const { data, error } = await categoryQueryClient
+        .from("categories")
+        .select("id, name, slug, priority, image_url");
+      if (error) {
+        console.error("Failed to load categories:", error);
+        return [];
+      }
+      return ((data as unknown as Category[]) || []).sort(
+        (a, b) => (a.priority ?? Number.MAX_SAFE_INTEGER) - (b.priority ?? Number.MAX_SAFE_INTEGER) || a.name.localeCompare(b.name),
+      );
+    },
+    staleTime: 300_000,
+  });
+
+  const addMutation = useMutation({
+    mutationFn: () =>
+      adminInsertCategory({ data: { name: name.trim(), priority, image_url: imageUrl.trim() } }),
+    onSuccess: () => {
+      setName("");
+      setPriority("");
+      setImageUrl("");
+      queryClient.invalidateQueries({ queryKey: ["admin", "categories"] });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, priority, image_url }: { id: string; priority?: string; image_url?: string | null }) =>
+      adminUpdateCategory({ data: { id, priority, image_url } }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "categories"] }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => adminDeleteCategory({ data: { id } }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "categories"] }),
+  });
+
+  const add = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (name.trim()) addMutation.mutate();
+  };
+
+  const uploadImage = async (category: Category, file: File) => {
+    try {
+      setUploadingId(category.id);
+      const extension = file.name.split(".").pop() || "jpg";
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve((reader.result as string).split(",")[1]);
+        reader.onerror = () => reject(new Error("Failed to read image"));
+        reader.readAsDataURL(file);
+      });
+      const result = await adminUploadImage({
+        data: {
+          fileName: `category_${category.id}_${Date.now()}.${extension}`,
+          base64,
+          contentType: file.type,
+        },
+      });
+      await updateMutation.mutateAsync({ id: category.id, image_url: result.publicUrl });
+    } catch (error) {
+      alert(
+        "Category image upload failed: " +
+          (error instanceof Error ? error.message : "Unknown error"),
+      );
+    } finally {
+      setUploadingId(null);
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <form onSubmit={add} className="flex flex-col gap-3 rounded-xl border bg-card p-4 sm:flex-row sm:p-6">
+        <input
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          placeholder="Category name"
+          className="min-w-0 flex-1 rounded-xl border bg-background px-4 py-3 text-base"
+        />
+        <input
+          value={priority}
+          onChange={(event) => setPriority(event.target.value)}
+          placeholder="Priority (1 = first)"
+          type="number"
+          min="1"
+          step="1"
+          className="rounded-xl border bg-background px-4 py-3 text-base sm:w-52"
+        />
+        <input
+          value={imageUrl}
+          onChange={(event) => setImageUrl(event.target.value)}
+          placeholder="Image URL (optional)"
+          type="url"
+          className="rounded-xl border bg-background px-4 py-3 text-base sm:w-64"
+        />
+        <button
+          type="submit"
+          disabled={!name.trim() || addMutation.isPending}
+          className="rounded-xl bg-primary px-5 py-3 text-base font-medium text-primary-foreground disabled:opacity-50"
+        >
+          {addMutation.isPending ? "Adding..." : "Add Category"}
+        </button>
+      </form>
+
+      {isLoading ? (
+        <div className="rounded-xl border bg-card p-6 text-muted-foreground">Loading categories...</div>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border bg-card">
+          <table className="w-full text-base">
+            <thead className="bg-muted text-left">
+              <tr>
+                <th className="p-3">Name</th>
+                <th className="p-3">Image</th>
+                <th className="p-3">Slug</th>
+                <th className="p-3">Priority</th>
+                <th className="p-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {categories.map((item) => (
+                <tr key={item.id} className="border-t">
+                  <td className="p-3 font-medium">{item.name}</td>
+                  <td className="p-3">
+                    <div className="flex items-center gap-2">
+                      {item.image_url ? (
+                        <img
+                          src={item.image_url}
+                          alt={item.name}
+                          className="h-12 w-12 rounded-lg object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-12 w-12 items-center justify-center rounded-lg border bg-muted text-xs text-muted-foreground">
+                          None
+                        </div>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        id={`category-image-${item.id}`}
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          if (file) uploadImage(item, file);
+                        }}
+                      />
+                      <label
+                        htmlFor={`category-image-${item.id}`}
+                        className="cursor-pointer rounded-lg border px-3 py-2 text-sm hover:bg-muted"
+                      >
+                        {uploadingId === item.id ? "Uploading..." : "Upload"}
+                      </label>
+                    </div>
+                  </td>
+                  <td className="p-3 text-muted-foreground">{item.slug}</td>
+                  <td className="p-3">
+                    <input
+                      defaultValue={item.priority ?? ""}
+                      type="number"
+                      min="1"
+                      step="1"
+                      placeholder="Auto"
+                      onBlur={(event) => {
+                        const value = event.target.value.trim();
+                        if (value === String(item.priority ?? "")) return;
+                        if (value !== "" && (!Number.isInteger(Number(value)) || Number(value) < 1)) {
+                          event.target.value = item.priority?.toString() || "";
+                          return;
+                        }
+                        updateMutation.mutate({ id: item.id, priority: value });
+                      }}
+                      className="w-28 rounded-lg border bg-background px-3 py-2"
+                    />
+                  </td>
+                  <td className="p-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm(`Delete ${item.name}?`)) deleteMutation.mutate(item.id);
+                      }}
+                      disabled={deleteMutation.isPending}
+                      className="px-2 py-2 text-sm font-medium text-destructive hover:underline disabled:opacity-50"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

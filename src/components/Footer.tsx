@@ -4,12 +4,8 @@ export function Footer() {
       <div className="mx-auto max-w-5xl px-4 sm:px-6">
         <div className="flex flex-col items-center gap-2 text-center sm:flex-row sm:justify-between sm:text-left">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <img
-              src="/MM.jpeg"
-              alt="Logo"
-              className="h-6 w-6 rounded-lg object-contain"
-            />
-            <span>Manapalle Mutton & Chicken</span>
+            <img src="/MM.jpeg" alt="Logo" className="h-6 w-6 rounded-lg object-contain" />
+            <span>Manapalle Products</span>
           </div>
           <p className="flex items-center gap-1 text-xs text-muted-foreground/70">
             Fresh from the Village, Straight to Your Home — 9030901233

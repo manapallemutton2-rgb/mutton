@@ -26,12 +26,12 @@ function Index() {
       <div className="text-center">
         <img
           src="/MM.jpeg"
-          alt="Manapalle Mutton"
+          alt="Manapalle Products"
           className="mx-auto mb-4 h-24 w-24 rounded-2xl object-contain shadow-lg"
         />
         <h1 className="text-4xl font-bold text-primary leading-tight">
           Manapalle
-          <span className="block text-xl font-medium opacity-80">Mutton & Chicken</span>
+          <span className="block text-xl font-medium opacity-80">Products</span>
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Fresh from the Village, Straight to Your Home — 9030901233

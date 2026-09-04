@@ -15,21 +15,21 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Manapalle Mutton - Order Fresh Meat Online" },
+      { title: "Manapalle Products - Order Fresh Products Online" },
       {
         name: "description",
         content:
-          "Fresh from the Village, Straight to Your Home. Order fresh meat delivered to your community.",
+          "Fresh from the Village, Straight to Your Home. Order fresh products delivered to your community.",
       },
-      { property: "og:title", content: "Manapalle Mutton - Order Fresh Meat Online" },
+      { property: "og:title", content: "Manapalle Products - Order Fresh Products Online" },
       {
         property: "og:description",
         content:
-          "Fresh from the Village, Straight to Your Home. Order fresh meat delivered to your community.",
+          "Fresh from the Village, Straight to Your Home. Order fresh products delivered to your community.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:title", content: "Manapalle Mutton - Order Fresh Meat Online" },
+      { name: "twitter:title", content: "Manapalle Products - Order Fresh Products Online" },
       {
         name: "twitter:description",
         content:

@@ -1,19 +1,17 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+﻿import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Minus, Plus, Trash2, ShoppingBag } from "lucide-react";
+import { ArrowLeft, Trash2, ShoppingBag } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { OrdersClosedBanner } from "@/components/OrdersClosedBanner";
 import { supabase } from "@/integrations/supabase/client";
-import { CartItem, cartTotal, getCart, removeFromCart, updateQty, unitToKg } from "@/lib/cart";
+import { CartItem, cartTotal, getCart, removeFromCart, unitToKg } from "@/lib/cart";
 import { getPhone } from "@/lib/session";
 
 export const Route = createFileRoute("/cart")({
   component: CartPage,
-  head: () => ({ meta: [{ title: "Cart - Manapalle Mutton" }] }),
+  head: () => ({ meta: [{ title: "Cart - Manapalle Products" }] }),
 });
-
-const step = (unit: string) => (unit.includes("g") || unit === "kg" ? 0.5 : 1);
 
 function groupItems(items: CartItem[]) {
   const groups = new Map<string, CartItem[]>();
@@ -85,7 +83,7 @@ function CartPage() {
               Your cart is empty
             </p>
             <p className="mt-2 text-sm text-muted-foreground/70 sm:text-base">
-              Add some fresh meat to get started
+              Add some fresh products to get started
             </p>
             <Link
               to="/shop"
@@ -103,7 +101,7 @@ function CartPage() {
                 const groupTotal = nameItems.reduce((s, i) => s + i.price * i.quantity, 0);
                 const showKg = nameItems.some((i) => unitToKg(i.unit, i.quantity) !== i.quantity);
                 return (
-                    <div key={name} className="rounded-2xl border bg-card p-3 sm:p-5">
+                  <div key={name} className="rounded-2xl border bg-card p-3 sm:p-5">
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-1 border-b pb-2">
                       <p className="text-sm font-bold sm:text-lg">{name}</p>
                       <p className="text-xs font-semibold text-primary sm:text-base">
@@ -114,28 +112,14 @@ function CartPage() {
                       const key = item.product_id + "|" + item.unit;
                       const itemKg = unitToKg(item.unit, item.quantity);
                       return (
-                        <div key={key} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 py-2">
+                        <div
+                          key={key}
+                          className="flex flex-wrap items-center gap-x-3 gap-y-1.5 py-2"
+                        >
                           <div className="min-w-0 flex-1 basis-full xs:basis-auto">
                             <p className="text-xs text-muted-foreground sm:text-sm">
                               {item.unit} · INR {item.price}/{item.unit}
                             </p>
-                          </div>
-                          <div className="flex items-center gap-1 rounded-lg border bg-background">
-                            <button
-                              onClick={() => updateQty(item.product_id, item.unit, item.quantity - step(item.unit))}
-                              className="flex h-7 w-7 items-center justify-center rounded-l-lg transition hover:bg-muted sm:h-9 sm:w-9"
-                            >
-                              <Minus className="h-3 w-3 sm:h-4 sm:w-4" />
-                            </button>
-                            <span className="flex w-7 items-center justify-center text-xs font-medium sm:w-10 sm:text-sm">
-                              {item.quantity}
-                            </span>
-                            <button
-                              onClick={() => updateQty(item.product_id, item.unit, item.quantity + step(item.unit))}
-                              className="flex h-7 w-7 items-center justify-center rounded-r-lg transition hover:bg-muted sm:h-9 sm:w-9"
-                            >
-                              <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
-                            </button>
                           </div>
                           <div className="ml-auto flex items-center gap-2">
                             <span className="text-xs font-bold text-primary sm:text-sm">

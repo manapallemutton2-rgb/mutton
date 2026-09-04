@@ -186,7 +186,8 @@ function lineChar(width: number, char = "-"): string {
 
 async function sendBytes(data: Uint8Array) {
   if (!btCharacteristic) throw new Error("Printer not connected");
-  const useResponse = btCharacteristic.properties.write && !btCharacteristic.properties.writeWithoutResponse;
+  const useResponse =
+    btCharacteristic.properties.write && !btCharacteristic.properties.writeWithoutResponse;
   const CHUNK = 20;
   for (let i = 0; i < data.length; i += CHUNK) {
     const chunk = data.slice(i, i + CHUNK);
@@ -261,7 +262,7 @@ export async function printReceipt(receipt: ReceiptData): Promise<boolean> {
   const hr = () => lines.push(lineChar(W));
   const hrD = () => lines.push(lineChar(W, "="));
 
-  lines.push(centerText("MANAPALLE MUTTON", W));
+  lines.push(centerText("MANAPALLE PRODUCTS", W));
   nl();
   lines.push(centerText(receipt.date || new Date().toLocaleString(), W));
   lines.push(centerText("Call: 9030 90 1233", W));

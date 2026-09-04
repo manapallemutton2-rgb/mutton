@@ -46,6 +46,7 @@ export const adminInsertProduct = createServerFn({ method: "POST" })
   .validator((data: unknown) => {
     const d = data as Record<string, unknown>;
     const stock = d.stock !== undefined && d.stock !== "" ? Number(d.stock) : null;
+    const priority = d.priority !== undefined && d.priority !== "" ? Number(d.priority) : null;
     return {
       name: String(d.name || ""),
       unit: String(d.unit || "kg"),
@@ -53,7 +54,8 @@ export const adminInsertProduct = createServerFn({ method: "POST" })
       image_url: d.image_url ? String(d.image_url) : null,
       stock: stock,
       active: true,
-      category: String(d.category || "other"),
+      category: String(d.category || "mutton"),
+      priority: priority,
     };
   })
   .handler(async ({ data }) => {
@@ -118,6 +120,64 @@ export const adminDeleteBlock = createServerFn({ method: "POST" })
     return { success: true };
   });
 
+// Category operations
+export const adminInsertCategory = createServerFn({ method: "POST" })
+  .validator((data: unknown) => {
+    const d = data as Record<string, unknown>;
+    const name = String(d.name || "").trim();
+    const slug = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    const priority = d.priority === undefined || d.priority === "" ? null : Number(d.priority);
+    if (priority !== null && (!Number.isInteger(priority) || priority < 1)) {
+      throw new Error("Priority must be a positive whole number");
+    }
+    return { name, slug, priority, image_url: d.image_url ? String(d.image_url) : null };
+  })
+  .handler(async ({ data }) => {
+    const admin = await getAdminClient();
+    const { error } = await admin.from("categories").insert({
+      name: data.name,
+      slug: data.slug,
+      priority: data.priority,
+      image_url: data.image_url,
+    });
+    if (error) throw new Error(error.message);
+    return { success: true };
+  });
+
+export const adminUpdateCategory = createServerFn({ method: "POST" })
+  .validator((data: unknown) => {
+    const d = data as Record<string, unknown>;
+    if (typeof d.id !== "string") throw new Error("Invalid category id");
+    const priority = d.priority === undefined || d.priority === "" ? null : Number(d.priority);
+    if (priority !== null && (!Number.isInteger(priority) || priority < 1)) {
+      throw new Error("Priority must be a positive whole number");
+    }
+    return {
+      id: d.id,
+      priority,
+      image_url: d.image_url === undefined ? undefined : d.image_url ? String(d.image_url) : null,
+    };
+  })
+  .handler(async ({ data }) => {
+    const admin = await getAdminClient();
+    const updates = {
+      priority: data.priority,
+      ...(data.image_url !== undefined && { image_url: data.image_url }),
+    };
+    const { error } = await admin.from("categories").update(updates).eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { success: true };
+  });
+
+export const adminDeleteCategory = createServerFn({ method: "POST" })
+  .validator((data: unknown) => ({ id: String((data as Record<string, unknown>).id || "") }))
+  .handler(async ({ data }) => {
+    const admin = await getAdminClient();
+    const { error } = await admin.from("categories").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { success: true };
+  });
+
 export const adminDeleteOrder = createServerFn({ method: "POST" })
   .validator((data: unknown) => {
     const d = data as Record<string, unknown>;
@@ -142,7 +202,7 @@ export const adminDeleteAllOrders = createServerFn({ method: "POST" })
     if (itemsError) throw new Error(itemsError.message);
 
     // Delete all orders. Use `not("id", "is", null)` (id IS NOT NULL) rather
-    // than `neq("id", "")` — comparing a uuid column to an empty string makes
+    // than `neq("id", "")` â€” comparing a uuid column to an empty string makes
     // Postgres raise "invalid input syntax for type uuid", so nothing gets deleted.
     const { error } = await admin.from("orders").delete().not("id", "is", null);
     if (error) throw new Error(error.message);

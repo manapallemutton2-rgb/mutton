@@ -180,6 +180,7 @@ export type Database = {
           unit: string;
           image_url?: string | null;
           stock?: number | null;
+          priority?: number | null;
         };
         Insert: {
           active?: boolean;
@@ -191,6 +192,7 @@ export type Database = {
           unit?: string;
           image_url?: string | null;
           stock?: number | null;
+          priority?: number | null;
         };
         Update: {
           active?: boolean;
@@ -202,6 +204,34 @@ export type Database = {
           unit?: string;
           image_url?: string | null;
           stock?: number | null;
+          priority?: number | null;
+        };
+        Relationships: [];
+      };
+      categories: {
+        Row: {
+          id: string;
+          name: string;
+          slug: string;
+          image_url: string | null;
+          priority: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          slug: string;
+          image_url?: string | null;
+          priority?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          slug?: string;
+          image_url?: string | null;
+          priority?: number | null;
+          created_at?: string;
         };
         Relationships: [];
       };

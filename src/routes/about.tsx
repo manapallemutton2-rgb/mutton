@@ -5,7 +5,7 @@ import { AboutSection } from "@/components/AboutSection";
 
 export const Route = createFileRoute("/about")({
   component: AboutPage,
-  head: () => ({ meta: [{ title: "About Us - Manapalle Mutton" }] }),
+  head: () => ({ meta: [{ title: "About Us - Manapalle Products" }] }),
 });
 
 function AboutPage() {

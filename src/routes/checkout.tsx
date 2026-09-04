@@ -15,7 +15,7 @@ type Block = { id: string; community_id: string; name: string };
 
 export const Route = createFileRoute("/checkout")({
   component: CheckoutPage,
-  head: () => ({ meta: [{ title: "Checkout - Manapalle Mutton" }] }),
+  head: () => ({ meta: [{ title: "Checkout - Manapalle Products" }] }),
 });
 
 function CheckoutPage() {
@@ -107,7 +107,7 @@ function CheckoutPage() {
     },
     staleTime: 300_000,
   });
- 
+
   const placeOrderMutation = useMutation({
     mutationFn: async () => {
       const phone = getPhone();
@@ -282,7 +282,7 @@ function CheckoutPage() {
                   <img src="/MM.jpeg" alt="Logo" style={{ height: 48, margin: "0 auto" }} />
                 </div>
                 <h1 style={{ textAlign: "center", fontSize: 16, letterSpacing: 1 }}>
-                  MANAPALLE MUTTON
+                  MANAPALLE PRODUCTS
                 </h1>
                 <div style={{ textAlign: "center", fontSize: 10, marginBottom: "2mm" }}>
                   {new Date(doneOrder.created_at).toLocaleString()}
@@ -323,9 +323,7 @@ function CheckoutPage() {
                           <td style={{ textAlign: "center", fontSize: 11 }}>
                             {it.unit} x{it.quantity}
                           </td>
-                          <td style={{ textAlign: "right", fontSize: 11 }}>
-                            INR {lineAmt}
-                          </td>
+                          <td style={{ textAlign: "right", fontSize: 11 }}>INR {lineAmt}</td>
                         </tr>
                       );
                     })}

@@ -12,7 +12,7 @@ export const Route = createFileRoute("/login")({
     if (getRole() === "user") throw { to: "/shop" };
   },
   component: LoginPage,
-  head: () => ({ meta: [{ title: "Login - Manapalle Mutton" }] }),
+  head: () => ({ meta: [{ title: "Login - Manapalle Products" }] }),
 });
 
 function LoginPage() {
@@ -73,9 +73,7 @@ function LoginPage() {
             />
             <h1 className="text-3xl font-bold text-primary leading-tight sm:text-4xl">
               Manapalle
-              <span className="block text-lg font-medium opacity-80 sm:text-xl">
-                Mutton & Chicken
-              </span>
+              <span className="block text-lg font-medium opacity-80 sm:text-xl">Products</span>
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Fresh from the Village, Straight to Your Home — 9030901233
@@ -190,9 +188,9 @@ function LoginPage() {
           <div className="mt-10 lg:hidden">
             <AboutSection />
             <div className="mt-4 space-y-1 rounded-xl bg-muted/30 px-5 py-4 text-sm text-muted-foreground">
-          <p>Village Gungal, Yacharam Mandal,</p>
-          <p>K.V.Rangareddy District - 501506</p>
-          <p className="pt-1 font-semibold text-primary">Cell: 9030901233</p>
+              <p>Village Gungal, Yacharam Mandal,</p>
+              <p>K.V.Rangareddy District - 501506</p>
+              <p className="pt-1 font-semibold text-primary">Cell: 9030901233</p>
             </div>
           </div>
         </div>

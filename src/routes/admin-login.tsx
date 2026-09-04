@@ -11,7 +11,7 @@ export const Route = createFileRoute("/admin-login")({
     }
   },
   component: AdminLoginPage,
-  head: () => ({ meta: [{ title: "Admin Login - Manapalle Mutton" }] }),
+  head: () => ({ meta: [{ title: "Admin Login - Manapalle Products" }] }),
 });
 
 function AdminLoginPage() {
@@ -53,12 +53,12 @@ function AdminLoginPage() {
         <div className="mb-6 text-center">
           <img
             src="/MM.jpeg"
-            alt="Manapalle Mutton logo"
+            alt="Manapalle Products logo"
             className="mx-auto mb-3 h-20 w-20 rounded-xl object-contain"
           />
           <h1 className="text-2xl font-bold text-primary">Admin Panel</h1>
           <p className="text-sm text-muted-foreground">
-            Manapalle <span className="text-xs opacity-70">Mutton & Chicken</span>
+            Manapalle <span className="text-xs opacity-70">Products</span>
           </p>
           <p className="mt-1 text-xs text-muted-foreground/70">
             Fresh from the Village, Straight to Your Home — 9030901233
