@@ -14,12 +14,25 @@ export function AboutSection() {
           <p className="text-xs text-muted-foreground">Products</p>
         </div>
       </div>
-      <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-        Our Male sheeps(గొర్రె పొట్టేలు) are raised the way nature intended—grazing on natural feed
-        in village farms without artificial shortcuts. We source fresh, naturally raised mutton
-        directly from trusted local sheep farmers and deliver it straight to your doorstep, ensuring
-        authentic taste, freshness, and quality in every cut.
-      </p>
+      <h3 className="mt-5 text-xl font-bold leading-tight text-primary">
+        Pure in Purpose. Fresh by Nature. Trusted by Families.
+      </h3>
+      <div className="mt-4 space-y-3 text-sm leading-relaxed text-muted-foreground">
+        <p>
+          At <strong className="text-foreground">Manapalle Products</strong>, we bring carefully
+          sourced food closer to your home - from fresh mutton, chicken, fish and seafood to
+          vegetables, wood-pressed oils, eggs and dairy products.
+        </p>
+        <p>
+          We believe great food starts with quality sourcing and careful handling. Wherever
+          practical, we work closer to the source to help bring you products that are fresh,
+          responsibly handled and closer to their natural goodness.
+        </p>
+        <p className="font-medium text-primary">
+          From our trusted sources to your family table - freshness you can trust, quality you can
+          feel.
+        </p>
+      </div>
       <div className="mt-5 grid grid-cols-2 gap-2 sm:gap-3">
         {["/1.jpeg", "/2.jpeg", "/3.jpeg", "/4.jpeg"].map((src) => (
           <div key={src} className="overflow-hidden rounded-xl">

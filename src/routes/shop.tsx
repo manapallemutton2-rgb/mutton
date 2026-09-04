@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getPhone, getRole } from "@/lib/session";
 import { AppHeader } from "@/components/AppHeader";
 import { OrdersClosedBanner } from "@/components/OrdersClosedBanner";
+import { AboutSection } from "@/components/AboutSection";
 
 type Product = {
   id: string;
@@ -431,6 +432,9 @@ function ShopPage() {
             </>
           )}
         </div>
+        <section className="mx-auto mt-8 max-w-3xl">
+          <AboutSection />
+        </section>
       </main>
     </div>
   );
