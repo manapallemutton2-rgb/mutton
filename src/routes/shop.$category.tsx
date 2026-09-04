@@ -46,21 +46,12 @@ function getCategorySizeOptions(cat: string) {
 
 
 
-const CATEGORY_META: Record<string, { label: string; color: string; bg: string; image?: string }> =
-  {
-    mutton: { label: "Mutton", color: "#C94F5C", bg: "#FDE8E8", image: "/mutton.avif" },
-    chicken: { label: "Chicken", color: "#D97706", bg: "#FEF3C7", image: "/chicken.webp" },
-    fish: { label: "Fish", color: "#0284C7", bg: "#E0F2FE", image: "/fish.jpg" },
-    prawns: { label: "Prawns", color: "#EA580C", bg: "#FFF7ED", image: "/fish.jpg" },
-    eggs: { label: "Eggs", color: "#7C3AED", bg: "#F5F3FF", image: "/Eggs.avif" },
-  };
-
-const FALLBACK_META = { label: "Other", color: "#6B7280", bg: "#F3F4F6" };
+const FALLBACK_META = { label: "Category", color: "#145B42", bg: "#F3F4F6" };
 
 export const Route = createFileRoute("/shop/$category")({
   component: CategoryPage,
   head: ({ params }) => {
-    const meta = CATEGORY_META[params.category] || FALLBACK_META;
+    const meta = FALLBACK_META;
     return { meta: [{ title: `${meta.label} - Manapalle Products` }] };
   },
 });
@@ -85,7 +76,7 @@ function CategoryPage() {
   });
 
   const publicCategory = categoryRows.find((item) => item.slug === category);
-  const fallbackMeta = CATEGORY_META[category] || FALLBACK_META;
+  const fallbackMeta = FALLBACK_META;
   const catMeta = {
     ...fallbackMeta,
     label: publicCategory?.name || fallbackMeta.label,

@@ -31,16 +31,7 @@ type PublicCategoryQueryClient = {
 
 const publicCategoryQueryClient = supabase as unknown as PublicCategoryQueryClient;
 
-const CATEGORY_META: Record<string, { label: string; color: string; bg: string; image?: string }> =
-  {
-    mutton: { label: "Mutton", color: "#C94F5C", bg: "#FDE8E8", image: "/mutton.avif" },
-    chicken: { label: "Chicken", color: "#D97706", bg: "#FEF3C7", image: "/chicken.webp" },
-    fish: { label: "Fish", color: "#0284C7", bg: "#E0F2FE", image: "/fish.jpg" },
-    prawns: { label: "Prawns", color: "#EA580C", bg: "#FFF7ED", image: "/fish.jpg" },
-    eggs: { label: "Eggs", color: "#7C3AED", bg: "#F5F3FF", image: "/Eggs.avif" },
-  };
-
-const FALLBACK_META = { label: "Other", color: "#6B7280", bg: "#F3F4F6" };
+const FALLBACK_META = { label: "Category", color: "#145B42", bg: "#F3F4F6" };
 
 export const Route = createFileRoute("/shop")({
   component: ShopPage,
@@ -132,7 +123,7 @@ function ShopPage() {
 
   const getCatMeta = (cat: string) => {
     const category = publicCategories.find((item) => item.slug === cat);
-    const fallback = CATEGORY_META[cat] || FALLBACK_META;
+    const fallback = FALLBACK_META;
     return {
       ...fallback,
       label: category?.name || fallback.label,

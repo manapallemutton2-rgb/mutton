@@ -2444,7 +2444,7 @@ function ProductsTab() {
   const [unit, setUnit] = useState("kg");
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
-  const [category, setCategory] = useState("mutton");
+  const [category, setCategory] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState<string>("all");
@@ -2487,13 +2487,7 @@ function ProductsTab() {
   const filteredProducts =
     filterCategory === "all" ? products : products.filter((p) => p.category === filterCategory);
 
-  const categoryOptions =
-    categories.length > 0
-      ? categories.map((item) => ({ slug: item.slug, name: item.name }))
-      : ["mutton", "chicken", "fish", "prawns", "eggs"].map((slug) => ({
-          slug,
-          name: slug.charAt(0).toUpperCase() + slug.slice(1),
-        }));
+  const categoryOptions = categories.map((item) => ({ slug: item.slug, name: item.name }));
 
   useEffect(() => {
     if (categories.length > 0 && !categories.some((item) => item.slug === category)) {
@@ -2531,7 +2525,7 @@ function ProductsTab() {
       setName("");
       setPrice("");
       setStock("");
-      setCategory("mutton");
+      setCategory(categoryOptions[0]?.slug || "");
       setImageUrl("");
       setNewPriority("");
       queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
@@ -2690,8 +2684,12 @@ function ProductsTab() {
           <select
           value={category}
           onChange={(e) => setCategory(e.target.value)}
+            required
           className="rounded-xl border bg-background px-4 py-4 text-base"
           >
+            <option value="" disabled>
+              Select category
+            </option>
             {categoryOptions.map((item) => (
               <option key={item.slug} value={item.slug}>
                 {item.name}
