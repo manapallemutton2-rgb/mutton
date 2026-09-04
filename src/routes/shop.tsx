@@ -17,6 +17,19 @@ type Product = {
   stock?: number | null;
   priority?: number | null;
 };
+type PublicCategory = {
+  name: string;
+  slug: string;
+  image_url?: string | null;
+  priority?: number | null;
+};
+type PublicCategoryQueryClient = {
+  from: (table: "categories") => {
+    select: (columns: string) => Promise<{ data: unknown[] | null; error: unknown | null }>;
+  };
+};
+
+const publicCategoryQueryClient = supabase as unknown as PublicCategoryQueryClient;
 
 const CATEGORY_META: Record<string, { label: string; color: string; bg: string; image?: string }> =
   {
@@ -77,15 +90,37 @@ function ShopPage() {
     staleTime: 60_000,
   });
 
-  const CATEGORY_ORDER = ["mutton", "chicken", "fish", "prawns", "eggs"];
-  const categories = Array.from(new Set(products.map((p) => p.category)))
+  const { data: publicCategories = [], isLoading: loadingCategories } =
+    useQuery<PublicCategory[]>({
+      queryKey: ["categories", "public"],
+      queryFn: async () => {
+        const { data, error } = await publicCategoryQueryClient
+          .from("categories")
+          .select("name, slug, image_url, priority");
+        if (error) {
+          console.error("Failed to load public categories:", error);
+          return [];
+        }
+        return (data as unknown as PublicCategory[]) || [];
+      },
+      staleTime: 60_000,
+    });
+
+  const categories = Array.from(
+    new Set([
+      ...publicCategories.map((category) => category.slug),
+      ...products.map((product) => product.category),
+    ]),
+  )
     .filter(Boolean)
     .sort((a, b) => {
-      const aIdx = CATEGORY_ORDER.indexOf(a);
-      const bIdx = CATEGORY_ORDER.indexOf(b);
-      const aRank = aIdx === -1 ? 999 : aIdx;
-      const bRank = bIdx === -1 ? 999 : bIdx;
-      return aRank - bRank;
+      const aCategory = publicCategories.find((category) => category.slug === a);
+      const bCategory = publicCategories.find((category) => category.slug === b);
+      return (
+        (aCategory?.priority ?? Number.MAX_SAFE_INTEGER) -
+          (bCategory?.priority ?? Number.MAX_SAFE_INTEGER) ||
+        (aCategory?.name || a).localeCompare(bCategory?.name || b)
+      );
     });
   const categoryCounts = categories.reduce(
     (acc, cat) => {
@@ -95,7 +130,15 @@ function ShopPage() {
     {} as Record<string, number>,
   );
 
-  const getCatMeta = (cat: string) => CATEGORY_META[cat] || FALLBACK_META;
+  const getCatMeta = (cat: string) => {
+    const category = publicCategories.find((item) => item.slug === cat);
+    const fallback = CATEGORY_META[cat] || FALLBACK_META;
+    return {
+      ...fallback,
+      label: category?.name || fallback.label,
+      image: category?.image_url || fallback.image,
+    };
+  };
 
   if (hasChild) {
     return (
@@ -305,7 +348,7 @@ function ShopPage() {
         <div id="category-grid" className="mt-2">
           <h2 className="mb-3 text-lg font-bold text-foreground sm:text-xl">Choose a Category</h2>
 
-          {isLoading ? (
+          {isLoading || loadingCategories ? (
             <div className="flex gap-4 overflow-hidden">
               {[1, 2, 3, 4].map((i) => (
                 <div

@@ -19,6 +19,12 @@ type Product = {
   stock?: number | null;
   priority?: number | null;
 };
+type PublicCategory = { name: string; slug: string; image_url?: string | null };
+type PublicCategoryQueryClient = {
+  from: (table: "categories") => {
+    select: (columns: string) => Promise<{ data: unknown[] | null; error: unknown | null }>;
+  };
+};
 
 const SIZE_OPTIONS = [
   { label: "500g", multiplier: 0.5 },
@@ -66,7 +72,25 @@ function CategoryPage() {
   const [search, setSearch] = useState("");
   const [showClosedPopup, setShowClosedPopup] = useState(false);
 
-  const catMeta = CATEGORY_META[category] || FALLBACK_META;
+  const { data: categoryRows = [] } = useQuery<PublicCategory[]>({
+    queryKey: ["categories", "public"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as unknown as PublicCategoryQueryClient)
+        .from("categories")
+        .select("name, slug, image_url");
+      if (error) return [];
+      return (data as unknown as PublicCategory[]) || [];
+    },
+    staleTime: 60_000,
+  });
+
+  const publicCategory = categoryRows.find((item) => item.slug === category);
+  const fallbackMeta = CATEGORY_META[category] || FALLBACK_META;
+  const catMeta = {
+    ...fallbackMeta,
+    label: publicCategory?.name || fallbackMeta.label,
+    image: publicCategory?.image_url || fallbackMeta.image,
+  };
 
   useEffect(() => {
     const phone = getPhone();
