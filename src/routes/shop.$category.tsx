@@ -21,6 +21,7 @@ type Product = {
   priority?: number | null;
 };
 type PublicCategory = { name: string; slug: string; image_url?: string | null };
+type PublicSubcategory = { name: string; slug: string; category_slug: string; priority?: number | null };
 type PublicCategoryQueryClient = {
   from: (table: "categories") => {
     select: (columns: string) => Promise<{ data: unknown[] | null; error: unknown | null }>;
@@ -82,6 +83,28 @@ function CategoryPage() {
     label: publicCategory?.name || fallbackMeta.label,
     image: publicCategory?.image_url || fallbackMeta.image,
   };
+
+  const { data: publicSubcategories = [] } = useQuery<PublicSubcategory[]>({
+    queryKey: ["subcategories", "public", category],
+    queryFn: async () => {
+      const { data, error } = await (supabase as unknown as {
+        from: (table: "subcategories") => {
+          select: (columns: string) => Promise<{ data: unknown[] | null; error: unknown | null }>;
+        };
+      })
+        .from("subcategories")
+        .select("name, slug, category_slug, priority");
+      if (error) return [];
+      return ((data as unknown as PublicSubcategory[]) || [])
+        .filter((item) => item.category_slug === category)
+        .sort(
+          (a, b) =>
+            (a.priority ?? Number.MAX_SAFE_INTEGER) - (b.priority ?? Number.MAX_SAFE_INTEGER) ||
+            a.name.localeCompare(b.name),
+        );
+    },
+    staleTime: 60_000,
+  });
 
   useEffect(() => {
     const phone = getPhone();
@@ -291,6 +314,19 @@ function CategoryPage() {
           <span className="text-sm text-muted-foreground">({filtered.length})</span>
         </div>
 
+        {publicSubcategories.length > 0 && (
+          <div className="mb-5 flex flex-wrap gap-2">
+            {publicSubcategories.map((subcategory) => (
+              <span
+                key={subcategory.slug}
+                className="rounded-full border border-primary/20 bg-primary/5 px-3 py-1.5 text-sm font-medium text-primary"
+              >
+                {subcategory.name} ({filtered.filter((p) => p.subcategory === subcategory.slug).length})
+              </span>
+            ))}
+          </div>
+        )}
+
         {/* PRODUCTS */}
         {isLoading ? (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
@@ -321,7 +357,7 @@ function CategoryPage() {
                 <div key={p.id} className="contents">
                   {p.subcategory && (idx === 0 || filtered[idx - 1]?.subcategory !== p.subcategory) && (
                     <h2 className="col-span-full mt-3 border-b pb-2 text-lg font-bold text-primary first:mt-0">
-                      {p.subcategory}
+                      {publicSubcategories.find((item) => item.slug === p.subcategory)?.name || p.subcategory}
                     </h2>
                   )}
                   <div

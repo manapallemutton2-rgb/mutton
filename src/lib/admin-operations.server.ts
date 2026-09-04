@@ -128,7 +128,7 @@ export const adminInsertCategory = createServerFn({ method: "POST" })
     const name = String(d.name || "").trim();
     const slug = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
     const priority = d.priority === undefined || d.priority === "" ? null : Number(d.priority);
-    if (priority !== null && (!Number.isInteger(priority) || priority < 1)) {
+    if (priority !== undefined && priority !== null && (!Number.isInteger(priority) || priority < 1)) {
       throw new Error("Priority must be a positive whole number");
     }
     return { name, slug, priority, image_url: d.image_url ? String(d.image_url) : null };
@@ -149,8 +149,8 @@ export const adminUpdateCategory = createServerFn({ method: "POST" })
   .validator((data: unknown) => {
     const d = data as Record<string, unknown>;
     if (typeof d.id !== "string") throw new Error("Invalid category id");
-    const priority = d.priority === undefined || d.priority === "" ? null : Number(d.priority);
-    if (priority !== null && (!Number.isInteger(priority) || priority < 1)) {
+    const priority = d.priority === undefined ? undefined : d.priority === "" ? null : Number(d.priority);
+    if (priority !== undefined && priority !== null && (!Number.isInteger(priority) || priority < 1)) {
       throw new Error("Priority must be a positive whole number");
     }
     return {
@@ -162,7 +162,7 @@ export const adminUpdateCategory = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const admin = await getAdminClient();
     const updates = {
-      priority: data.priority,
+      ...(data.priority !== undefined && { priority: data.priority }),
       ...(data.image_url !== undefined && { image_url: data.image_url }),
     };
     const { error } = await admin.from("categories").update(updates).eq("id", data.id);
