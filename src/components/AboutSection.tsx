@@ -10,8 +10,7 @@ export function AboutSection() {
           className="h-10 w-10 rounded-xl object-contain shadow-sm"
         />
         <div>
-          <h2 className="text-lg font-bold text-primary">About Manapalle</h2>
-          <p className="text-xs text-muted-foreground">Products</p>
+          <h2 className="text-lg font-bold text-primary">Manapalle Products</h2>
         </div>
       </div>
       <h3 className="mt-5 text-xl font-bold leading-tight text-primary">
