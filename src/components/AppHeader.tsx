@@ -117,7 +117,7 @@ export function AppHeader({ title }: { title?: string }) {
           <img
             src="/MM.jpeg"
             alt="Manapalle"
-            className="h-8 w-8 rounded-lg object-cover ring-2 ring-white/20 sm:h-9 sm:w-9"
+            className="h-10 w-10 rounded-lg object-cover ring-2 ring-white/20 sm:h-12 sm:w-12"
           />
           <div className="min-w-0">
             <div className="flex items-baseline gap-1.5">

@@ -247,7 +247,7 @@ function ShopPage() {
                 <img
                   src="/A+.jpeg"
                   alt="A+ Tech Services"
-                  className="h-8 w-8 rounded object-contain transition group-hover:scale-110 sm:h-10 sm:w-10"
+                  className="h-11 w-11 rounded object-contain transition group-hover:scale-110 sm:h-14 sm:w-14"
                 />
                 <span className="text-sm font-extrabold text-primary sm:text-base">
                   A+ Tech Services
