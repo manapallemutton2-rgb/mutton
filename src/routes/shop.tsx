@@ -228,25 +228,28 @@ function ShopPage() {
                 Call 90309 01233
               </a>
             </div>
+            <div className="relative flex justify-center pb-6 sm:pb-10 lg:justify-start">
+              <a
+                href="https://aplustechservices.in"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex items-center justify-center gap-2 rounded-xl bg-white/70 px-4 py-2.5 shadow-sm transition hover:bg-white"
+              >
+                <span className="text-xs font-medium text-muted-foreground sm:text-sm">
+                  Powered by
+                </span>
+                <img
+                  src="/A+.jpeg"
+                  alt="A+ Tech Services"
+                  className="h-8 w-8 rounded object-contain transition group-hover:scale-110 sm:h-10 sm:w-10"
+                />
+                <span className="text-sm font-extrabold text-primary sm:text-base">
+                  A+ Tech Services
+                </span>
+              </a>
+            </div>
           </div>
         </section>
-
-        <div className="mx-auto max-w-2xl px-4 pb-3">
-          <a
-            href="https://aplustechservices.in"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group flex items-center justify-center gap-2 overflow-hidden rounded-lg bg-primary/5 px-3 py-2 transition active:scale-[0.98]"
-          >
-            <span className="shrink-0 text-[10px] text-muted-foreground">Powered by</span>
-            <img
-              src="/A+.jpeg"
-              alt="A+ Tech Services"
-              className="h-5 w-5 shrink-0 rounded object-contain transition group-hover:scale-110"
-            />
-            <span className="shrink-0 text-[10px] font-bold text-primary">A+ Tech Services</span>
-          </a>
-        </div>
 
         {/* TRUST STRIP */}
         <section className="relative z-10 mx-auto max-w-5xl px-4 pb-4 sm:px-6">

@@ -296,6 +296,7 @@ export async function printReceipt(receipt: ReceiptData): Promise<boolean> {
   hr();
   nl();
   lines.push(centerText("Thank you! Visit again", W));
+  lines.push(centerText("Powered by A+ Tech Services", W));
   nl();
   nl();
   nl();
