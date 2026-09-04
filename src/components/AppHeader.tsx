@@ -121,8 +121,9 @@ export function AppHeader({ title }: { title?: string }) {
           />
           <div className="min-w-0">
             <div className="flex items-baseline gap-1.5">
-              <span className="text-base font-bold tracking-tight text-white sm:text-lg">Manapalle</span>
-              <span className="hidden text-sm font-light text-white/70 sm:inline">Manapalle Products</span>
+              <span className="text-base font-bold tracking-tight text-white sm:text-lg">
+                Manapalle Products
+              </span>
             </div>
             <p className="hidden text-[10px] leading-tight text-white/50 sm:block">
               Fresh from the Village, Straight to Your Home

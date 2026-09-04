@@ -173,6 +173,7 @@ export type Database = {
         Row: {
           active: boolean;
           category: string;
+          subcategory: string | null;
           created_at: string;
           id: string;
           name: string;
@@ -185,6 +186,7 @@ export type Database = {
         Insert: {
           active?: boolean;
           category?: string;
+          subcategory?: string | null;
           created_at?: string;
           id?: string;
           name: string;
@@ -197,6 +199,7 @@ export type Database = {
         Update: {
           active?: boolean;
           category?: string;
+          subcategory?: string | null;
           created_at?: string;
           id?: string;
           name?: string;
@@ -230,6 +233,33 @@ export type Database = {
           name?: string;
           slug?: string;
           image_url?: string | null;
+          priority?: number | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      subcategories: {
+        Row: {
+          id: string;
+          category_slug: string;
+          name: string;
+          slug: string;
+          priority: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          category_slug: string;
+          name: string;
+          slug: string;
+          priority?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          category_slug?: string;
+          name?: string;
+          slug?: string;
           priority?: number | null;
           created_at?: string;
         };

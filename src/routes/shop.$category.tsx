@@ -15,6 +15,7 @@ type Product = {
   price: number;
   active: boolean;
   category: string;
+  subcategory?: string | null;
   image_url?: string | null;
   stock?: number | null;
   priority?: number | null;
@@ -45,7 +46,7 @@ function getCategorySizeOptions(categorySlug: string, productName: string) {
 
 
 
-const FALLBACK_META = { label: "Category", color: "#145B42", bg: "#F3F4F6" };
+const FALLBACK_META = { label: "Category", color: "#145B42", bg: "#F3F4F6", image: undefined };
 
 export const Route = createFileRoute("/shop/$category")({
   component: CategoryPage,
@@ -116,7 +117,7 @@ function CategoryPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, unit, price, image_url, active, category, stock, priority");
+        .select("id, name, unit, price, image_url, active, category, subcategory, stock, priority");
       if (error) {
         console.error("Failed to load products:", error);
         return [];
@@ -153,7 +154,7 @@ function CategoryPage() {
     const matchesCategory = p.category === category;
     const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase());
     return matchesCategory && matchesSearch;
-  });
+  }).sort((a, b) => (a.subcategory || "").localeCompare(b.subcategory || "") || a.name.localeCompare(b.name));
 
   const add = (p: Product, sizeLabel: string, sizePrice: number) => {
     if (!ordersOpen) {
@@ -317,10 +318,15 @@ function CategoryPage() {
             {filtered.map((p, idx) => {
               const sizes = hasSizes(p) ? getCategorySizeOptions(category, p.name) : null;
               return (
-                <div
-                  key={p.id}
-                  className={`animate-slide-up stagger-${Math.min(idx + 1, 6)} group flex flex-col overflow-hidden rounded-xl border bg-card shadow-sm transition hover:shadow-md`}
-                >
+                <div key={p.id} className="contents">
+                  {p.subcategory && (idx === 0 || filtered[idx - 1]?.subcategory !== p.subcategory) && (
+                    <h2 className="col-span-full mt-3 border-b pb-2 text-lg font-bold text-primary first:mt-0">
+                      {p.subcategory}
+                    </h2>
+                  )}
+                  <div
+                    className={`animate-slide-up stagger-${Math.min(idx + 1, 6)} group flex flex-col overflow-hidden rounded-xl border bg-card shadow-sm transition hover:shadow-md`}
+                  >
                   {/* Image */}
                   <div className="relative aspect-square shrink-0 overflow-hidden">
                     {p.image_url ? (
@@ -464,6 +470,7 @@ function CategoryPage() {
                         })()}
                       </div>
                     )}
+                  </div>
                   </div>
                 </div>
               );

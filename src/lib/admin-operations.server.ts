@@ -55,6 +55,7 @@ export const adminInsertProduct = createServerFn({ method: "POST" })
       stock: stock,
       active: true,
       category: String(d.category || "mutton"),
+      subcategory: d.subcategory ? String(d.subcategory) : null,
       priority: priority,
     };
   })
@@ -165,6 +166,35 @@ export const adminUpdateCategory = createServerFn({ method: "POST" })
       ...(data.image_url !== undefined && { image_url: data.image_url }),
     };
     const { error } = await admin.from("categories").update(updates).eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { success: true };
+  });
+
+export const adminInsertSubcategory = createServerFn({ method: "POST" })
+  .validator((data: unknown) => {
+    const d = data as Record<string, unknown>;
+    const name = String(d.name || "").trim();
+    const category_slug = String(d.category_slug || "").trim();
+    const slug = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    const priority = d.priority === undefined || d.priority === "" ? null : Number(d.priority);
+    if (!name || !category_slug) throw new Error("Category and subcategory name are required");
+    if (priority !== null && (!Number.isInteger(priority) || priority < 1)) {
+      throw new Error("Priority must be a positive whole number");
+    }
+    return { name, category_slug, slug, priority };
+  })
+  .handler(async ({ data }) => {
+    const admin = await getAdminClient();
+    const { error } = await admin.from("subcategories").insert(data);
+    if (error) throw new Error(error.message);
+    return { success: true };
+  });
+
+export const adminDeleteSubcategory = createServerFn({ method: "POST" })
+  .validator((data: unknown) => ({ id: String((data as Record<string, unknown>).id || "") }))
+  .handler(async ({ data }) => {
+    const admin = await getAdminClient();
+    const { error } = await admin.from("subcategories").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     return { success: true };
   });

@@ -57,6 +57,8 @@ import {
   adminInsertCategory,
   adminUpdateCategory,
   adminDeleteCategory,
+  adminInsertSubcategory,
+  adminDeleteSubcategory,
   adminRemoveProductImage,
   adminDeleteOrder,
   adminDeleteAllOrders,
@@ -70,6 +72,7 @@ type Product = {
   price: number;
   active: boolean;
   category: string;
+  subcategory?: string | null;
   image_url?: string | null;
   stock?: number | null;
   priority?: number | null;
@@ -81,6 +84,13 @@ type Category = {
   priority?: number | null;
   image_url?: string | null;
   created_at?: string;
+};
+type Subcategory = {
+  id: string;
+  category_slug: string;
+  name: string;
+  slug: string;
+  priority?: number | null;
 };
 type CategoryQueryClient = {
   from: (table: "categories") => {
@@ -127,6 +137,7 @@ type Tab =
   | "items"
   | "products"
   | "categories"
+  | "subcategories"
   | "communities"
   | "settings";
 
@@ -153,7 +164,7 @@ function AdminPage() {
       <main className="mx-auto max-w-6xl px-3 py-4 sm:px-4 sm:py-6">
         <div className="no-print mb-5 flex gap-1 overflow-x-auto border-b sm:gap-2">
           {(
-            ["stats", "orders", "items", "products", "categories", "communities", "settings"] as Tab[]
+            ["stats", "orders", "items", "products", "categories", "subcategories", "communities", "settings"] as Tab[]
           ).map(
             (t) => (
               <button
@@ -175,6 +186,7 @@ function AdminPage() {
         {tab === "items" && <ItemSalesTab />}
         {tab === "products" && <ProductsTab />}
         {tab === "categories" && <CategoriesTab />}
+        {tab === "subcategories" && <SubcategoriesTab />}
         {tab === "communities" && <CommunitiesTab />}
         {tab === "settings" && <SettingsTab />}
       </main>
@@ -2445,6 +2457,7 @@ function ProductsTab() {
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
   const [category, setCategory] = useState("");
+  const [subcategory, setSubcategory] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState<string>("all");
@@ -2455,7 +2468,7 @@ function ProductsTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, unit, price, image_url, active, category, created_at, stock, priority")
+        .select("id, name, unit, price, image_url, active, category, subcategory, created_at, stock, priority")
         .order("priority", { ascending: true, nullsFirst: false })
         .order("name");
       if (error) {
@@ -2489,11 +2502,33 @@ function ProductsTab() {
 
   const categoryOptions = categories.map((item) => ({ slug: item.slug, name: item.name }));
 
+  const { data: subcategories = [] } = useQuery<Subcategory[]>({
+    queryKey: ["admin", "subcategories"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("subcategories")
+        .select("id, category_slug, name, slug, priority")
+        .order("priority", { ascending: true, nullsFirst: false })
+        .order("name");
+      if (error) return [];
+      return (data as Subcategory[]) || [];
+    },
+    staleTime: 300_000,
+  });
+
+  const subcategoryOptions = subcategories.filter((item) => item.category_slug === category);
+
   useEffect(() => {
     if (categories.length > 0 && !categories.some((item) => item.slug === category)) {
       setCategory(categories[0].slug);
     }
   }, [categories, category]);
+
+  useEffect(() => {
+    if (subcategory && !subcategoryOptions.some((item) => item.slug === subcategory)) {
+      setSubcategory("");
+    }
+  }, [category, subcategory, subcategoryOptions]);
 
   useEffect(() => {
     const channel = supabase
@@ -2517,6 +2552,7 @@ function ProductsTab() {
           stock: stock || null,
           image_url: imageUrl.trim() || null,
           category,
+          subcategory: subcategory || null,
           priority: newPriority !== "" ? Number(newPriority) : null,
         },
       });
@@ -2526,6 +2562,7 @@ function ProductsTab() {
       setPrice("");
       setStock("");
       setCategory(categoryOptions[0]?.slug || "");
+      setSubcategory("");
       setImageUrl("");
       setNewPriority("");
       queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
@@ -2566,6 +2603,7 @@ function ProductsTab() {
         stock?: number | null;
         active?: boolean;
         category?: string;
+        subcategory?: string | null;
         image_url?: string | null;
         priority?: number | null;
       };
@@ -2697,6 +2735,21 @@ function ProductsTab() {
             ))}
           </select>
         <select
+          value={subcategory}
+          onChange={(e) => setSubcategory(e.target.value)}
+          disabled={subcategoryOptions.length === 0}
+          className="rounded-xl border bg-background px-4 py-4 text-base"
+        >
+          <option value="">
+            {subcategoryOptions.length ? "Select subcategory (optional)" : "No subcategories"}
+          </option>
+          {subcategoryOptions.map((item) => (
+            <option key={item.slug} value={item.slug}>
+              {item.name}
+            </option>
+          ))}
+        </select>
+        <select
           value={unit}
           onChange={(e) => setUnit(e.target.value)}
           className="rounded-xl border bg-background px-4 py-4 text-base"
@@ -2817,6 +2870,27 @@ function ProductsTab() {
                         {item.name}
                       </option>
                     ))}
+                  </select>
+                </td>
+                <td className="p-3">
+                  <select
+                    defaultValue={p.subcategory || ""}
+                    onChange={(e) =>
+                      updateProductMutation.mutate({
+                        id: p.id,
+                        updates: { subcategory: e.target.value || null },
+                      })
+                    }
+                    className="rounded-xl border bg-background px-3 py-2 text-base"
+                  >
+                    <option value="">No subcategory</option>
+                    {subcategories
+                      .filter((item) => item.category_slug === p.category)
+                      .map((item) => (
+                        <option key={item.slug} value={item.slug}>
+                          {item.name}
+                        </option>
+                      ))}
                   </select>
                 </td>
                 <td className="p-3">
@@ -3327,6 +3401,82 @@ function CategoriesTab() {
 }
 
 /* ---------------- Communities & Blocks ---------------- */
+function SubcategoriesTab() {
+  const queryClient = useQueryClient();
+  const [name, setName] = useState("");
+  const [categorySlug, setCategorySlug] = useState("");
+  const [priority, setPriority] = useState("");
+
+  const { data: categories = [] } = useQuery<Category[]>({
+    queryKey: ["admin", "categories"],
+    queryFn: async () => {
+      const { data, error } = await categoryQueryClient.from("categories").select("id, name, slug, priority");
+      if (error) return [];
+      return ((data as unknown as Category[]) || []).sort(
+        (a, b) => (a.priority ?? Number.MAX_SAFE_INTEGER) - (b.priority ?? Number.MAX_SAFE_INTEGER) || a.name.localeCompare(b.name),
+      );
+    },
+    staleTime: 300_000,
+  });
+
+  const { data: subcategories = [], isLoading } = useQuery<Subcategory[]>({
+    queryKey: ["admin", "subcategories"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("subcategories")
+        .select("id, category_slug, name, slug, priority")
+        .order("priority", { ascending: true, nullsFirst: false })
+        .order("name");
+      if (error) return [];
+      return (data as Subcategory[]) || [];
+    },
+    staleTime: 300_000,
+  });
+
+  const addMutation = useMutation({
+    mutationFn: () => adminInsertSubcategory({ data: { name, category_slug: categorySlug, priority } }),
+    onSuccess: () => {
+      setName("");
+      setPriority("");
+      queryClient.invalidateQueries({ queryKey: ["admin", "subcategories"] });
+    },
+  });
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => adminDeleteSubcategory({ data: { id } }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "subcategories"] }),
+  });
+
+  return (
+    <div className="space-y-5">
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (name.trim() && categorySlug) addMutation.mutate();
+        }}
+        className="flex flex-col gap-3 rounded-xl border bg-card p-4 sm:flex-row sm:p-6"
+      >
+        <select value={categorySlug} onChange={(event) => setCategorySlug(event.target.value)} required className="rounded-xl border bg-background px-4 py-3">
+          <option value="" disabled>Select parent category</option>
+          {categories.map((item) => <option key={item.slug} value={item.slug}>{item.name}</option>)}
+        </select>
+        <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Subcategory name" className="min-w-0 flex-1 rounded-xl border bg-background px-4 py-3" />
+        <input value={priority} onChange={(event) => setPriority(event.target.value)} placeholder="Priority" type="number" min="1" className="rounded-xl border bg-background px-4 py-3 sm:w-32" />
+        <button type="submit" disabled={!name.trim() || !categorySlug || addMutation.isPending} className="rounded-xl bg-primary px-5 py-3 font-medium text-primary-foreground disabled:opacity-50">
+          {addMutation.isPending ? "Adding..." : "Add Subcategory"}
+        </button>
+      </form>
+      {isLoading ? <div className="rounded-xl border bg-card p-6 text-muted-foreground">Loading subcategories...</div> : (
+        <div className="overflow-x-auto rounded-xl border bg-card">
+          <table className="w-full text-base">
+            <thead className="bg-muted text-left"><tr><th className="p-3">Subcategory</th><th className="p-3">Category</th><th className="p-3">Priority</th><th className="p-3 text-right">Actions</th></tr></thead>
+            <tbody>{subcategories.map((item) => <tr key={item.id} className="border-t"><td className="p-3 font-medium">{item.name}</td><td className="p-3">{categories.find((category) => category.slug === item.category_slug)?.name || item.category_slug}</td><td className="p-3">{item.priority ?? "Auto"}</td><td className="p-3 text-right"><button type="button" onClick={() => { if (confirm(`Delete ${item.name}?`)) deleteMutation.mutate(item.id); }} className="px-2 py-2 text-sm font-medium text-destructive hover:underline">Delete</button></td></tr>)}</tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CommunitiesTab() {
   const queryClient = useQueryClient();
   const [newCommunity, setNewCommunity] = useState("");
