@@ -56,8 +56,8 @@ function LoginPage() {
               className="mx-auto mb-3 h-20 w-20 rounded-2xl object-contain shadow-lg"
             />
             <h1 className="text-3xl font-bold text-primary leading-tight sm:text-4xl">
-              Manapalle
-              <span className="block text-lg font-medium opacity-80 sm:text-xl">Products</span>
+              
+              <span className="block text-lg font-medium opacity-80 sm:text-xl">Manapalle Products</span>
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Fresh from the Village, Straight to Your Home — 9030901233
