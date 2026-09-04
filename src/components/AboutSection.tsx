@@ -10,7 +10,7 @@ export function AboutSection() {
           className="h-10 w-10 rounded-xl object-contain shadow-sm"
         />
         <div>
-          <h2 className="text-lg font-bold text-primary">Manapalle Products</h2>
+          <h2 className="text-lg font-bold text-primary">About Manapalle Products</h2>
         </div>
       </div>
       <h3 className="mt-5 text-xl font-bold leading-tight text-primary">
@@ -18,7 +18,7 @@ export function AboutSection() {
       </h3>
       <div className="mt-4 space-y-3 text-sm leading-relaxed text-muted-foreground">
         <p>
-          At <strong className="text-foreground">About Manapalle Products</strong>, we bring carefully
+          At <strong className="text-foreground">Manapalle Products</strong>, we bring carefully
           sourced food closer to your home - from fresh mutton, chicken, fish and seafood to
           vegetables, wood-pressed oils, eggs and dairy products.
         </p>
