@@ -31,7 +31,12 @@ type PublicCategoryQueryClient = {
 
 const publicCategoryQueryClient = supabase as unknown as PublicCategoryQueryClient;
 
-const FALLBACK_META = { label: "Category", color: "#145B42", bg: "#F3F4F6" };
+const FALLBACK_META = {
+  label: "Category",
+  color: "#145B42",
+  bg: "#F3F4F6",
+  image: undefined as string | undefined,
+};
 
 export const Route = createFileRoute("/shop")({
   component: ShopPage,
@@ -168,7 +173,7 @@ function ShopPage() {
                   className="text-xl font-bold leading-tight sm:text-4xl lg:text-6xl"
                   style={{ color: "#145B42" }}
                 >
-                  Fresh Mutton
+                  Fresh Products
                   <span
                     className="block text-base font-medium sm:text-3xl lg:text-5xl"
                     style={{ color: "#4F7F35" }}
@@ -186,7 +191,7 @@ function ShopPage() {
                   className="mt-3 text-xs sm:mt-4 sm:text-base lg:text-lg"
                   style={{ color: "#6B4630" }}
                 >
-                  100% fresh, tender and hygienically packed mutton, cut by hand and delivered
+                  100% fresh packed products, cut by hand and delivered
                   straight from Manapalle village to your kitchen.
                 </p>
               </div>
