@@ -18,7 +18,7 @@ export function AboutSection() {
       </h3>
       <div className="mt-4 space-y-3 text-sm leading-relaxed text-muted-foreground">
         <p>
-          At <strong className="text-foreground">Manapalle Products</strong>, we bring carefully
+          At <strong className="text-foreground">About Manapalle Products</strong>, we bring carefully
           sourced food closer to your home - from fresh mutton, chicken, fish and seafood to
           vegetables, wood-pressed oils, eggs and dairy products.
         </p>
