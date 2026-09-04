@@ -21,8 +21,8 @@ const CATEGORY_META: Record<string, { label: string; color: string; bg: string; 
   mutton: { label: "Mutton", color: "#C94F5C", bg: "#FDE8E8", image: "/mutton.avif" },
   chicken: { label: "Chicken", color: "#D97706", bg: "#FEF3C7", image: "/chicken.webp" },
   fish: { label: "Fish", color: "#0284C7", bg: "#E0F2FE", image: "/fish.jpg" },
-  prawns: { label: "Prawns", color: "#EA580C", bg: "#FFF7ED" },
-  eggs: { label: "Eggs", color: "#7C3AED", bg: "#F5F3FF" },
+  prawns: { label: "Prawns", color: "#EA580C", bg: "#FFF7ED", image: "/fish.jpg" },
+  eggs: { label: "Eggs", color: "#7C3AED", bg: "#F5F3FF", image: "/Eggs.avif" },
   other: { label: "Other", color: "#6B7280", bg: "#F3F4F6" },
 };
 
