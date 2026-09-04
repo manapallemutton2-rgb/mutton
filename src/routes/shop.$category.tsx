@@ -34,13 +34,12 @@ const SIZE_OPTIONS = [
 // Size options for different categories
 const ALL_SIZE_OPTIONS = SIZE_OPTIONS;
 
-// Get size options based on category
-function getCategorySizeOptions(cat: string) {
-  if (cat === "fish" || cat === "prawns") {
-    // Fish and prawns: only 1kg
+// Fish, prawns, and crab products are sold only in 1kg portions.
+function getCategorySizeOptions(categorySlug: string, productName: string) {
+  const fishOnly = `${categorySlug} ${productName}`.toLowerCase();
+  if (/(fish|prawns?|crab)/.test(fishOnly)) {
     return [{ label: "1kg", multiplier: 1 }];
   }
-  // All other categories: 500g, 750g, 1kg
   return ALL_SIZE_OPTIONS;
 }
 
@@ -316,7 +315,7 @@ function CategoryPage() {
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
             {filtered.map((p, idx) => {
-              const sizes = hasSizes(p) ? getCategorySizeOptions(category) : null;
+              const sizes = hasSizes(p) ? getCategorySizeOptions(category, p.name) : null;
               return (
                 <div
                   key={p.id}
