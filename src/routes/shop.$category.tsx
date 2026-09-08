@@ -21,7 +21,12 @@ type Product = {
   priority?: number | null;
 };
 type PublicCategory = { name: string; slug: string; image_url?: string | null };
-type PublicSubcategory = { name: string; slug: string; category_slug: string; priority?: number | null };
+type PublicSubcategory = {
+  name: string;
+  slug: string;
+  category_slug: string;
+  priority?: number | null;
+};
 type PublicCategoryQueryClient = {
   from: (table: "categories") => {
     select: (columns: string) => Promise<{ data: unknown[] | null; error: unknown | null }>;
@@ -44,8 +49,6 @@ function getCategorySizeOptions(categorySlug: string, productName: string) {
   }
   return ALL_SIZE_OPTIONS;
 }
-
-
 
 const FALLBACK_META = { label: "Category", color: "#145B42", bg: "#F3F4F6", image: undefined };
 
@@ -87,11 +90,13 @@ function CategoryPage() {
   const { data: publicSubcategories = [] } = useQuery<PublicSubcategory[]>({
     queryKey: ["subcategories", "public", category],
     queryFn: async () => {
-      const { data, error } = await (supabase as unknown as {
-        from: (table: "subcategories") => {
-          select: (columns: string) => Promise<{ data: unknown[] | null; error: unknown | null }>;
-        };
-      })
+      const { data, error } = await (
+        supabase as unknown as {
+          from: (table: "subcategories") => {
+            select: (columns: string) => Promise<{ data: unknown[] | null; error: unknown | null }>;
+          };
+        }
+      )
         .from("subcategories")
         .select("name, slug, category_slug, priority");
       if (error) return [];
@@ -99,8 +104,7 @@ function CategoryPage() {
         .filter((item) => item.category_slug === category)
         .sort(
           (a, b) =>
-            (a.priority ?? Number.MAX_SAFE_INTEGER) - (b.priority ?? Number.MAX_SAFE_INTEGER) ||
-            a.name.localeCompare(b.name),
+            (a.priority ?? Number.MAX_SAFE_INTEGER) - (b.priority ?? Number.MAX_SAFE_INTEGER),
         );
     },
     staleTime: 60_000,
@@ -140,19 +144,17 @@ function CategoryPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, unit, price, image_url, active, category, subcategory, stock, priority");
+        .select("id, name, unit, price, image_url, active, category, subcategory, stock, priority")
+        .eq("active", true);
       if (error) {
         console.error("Failed to load products:", error);
         return [];
       }
-      const result = (data as Product[]) || [];
-      result.sort((a, b) => {
+      return ((data as Product[]) || []).sort((a, b) => {
         const pa = a.priority ?? 9999;
         const pb = b.priority ?? 9999;
-        if (pa !== pb) return pa - pb;
-        return a.name.localeCompare(b.name);
+        return pa - pb;
       });
-      return result;
     },
     staleTime: 60_000,
   });
@@ -173,11 +175,17 @@ function CategoryPage() {
 
   const cartCount = getCart().reduce((s, i) => s + i.quantity, 0);
 
-  const filtered = products.filter((p) => {
-    const matchesCategory = p.category === category;
-    const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase());
-    return matchesCategory && matchesSearch;
-  }).sort((a, b) => (a.subcategory || "").localeCompare(b.subcategory || "") || a.name.localeCompare(b.name));
+  const filtered = products
+    .filter((p) => {
+      const matchesCategory = p.category === category;
+      const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase());
+      return matchesCategory && matchesSearch;
+    })
+    .sort((a, b) => {
+      const pa = a.priority ?? 9999;
+      const pb = b.priority ?? 9999;
+      return pa - pb;
+    });
 
   const add = (p: Product, sizeLabel: string, sizePrice: number) => {
     if (!ordersOpen) {
@@ -321,7 +329,8 @@ function CategoryPage() {
                 key={subcategory.slug}
                 className="rounded-full border border-primary/20 bg-primary/5 px-3 py-1.5 text-sm font-medium text-primary"
               >
-                {subcategory.name} ({filtered.filter((p) => p.subcategory === subcategory.slug).length})
+                {subcategory.name} (
+                {filtered.filter((p) => p.subcategory === subcategory.slug).length})
               </span>
             ))}
           </div>
@@ -355,158 +364,164 @@ function CategoryPage() {
               const sizes = hasSizes(p) ? getCategorySizeOptions(category, p.name) : null;
               return (
                 <div key={p.id} className="contents">
-                  {p.subcategory && (idx === 0 || filtered[idx - 1]?.subcategory !== p.subcategory) && (
-                    <h2 className="col-span-full mt-3 border-b pb-2 text-lg font-bold text-primary first:mt-0">
-                      {publicSubcategories.find((item) => item.slug === p.subcategory)?.name || p.subcategory}
-                    </h2>
-                  )}
+                  {p.subcategory &&
+                    (idx === 0 || filtered[idx - 1]?.subcategory !== p.subcategory) && (
+                      <h2 className="col-span-full mt-3 border-b pb-2 text-lg font-bold text-primary first:mt-0">
+                        {publicSubcategories.find((item) => item.slug === p.subcategory)?.name ||
+                          p.subcategory}
+                      </h2>
+                    )}
                   <div
                     className={`animate-slide-up stagger-${Math.min(idx + 1, 6)} group flex flex-col overflow-hidden rounded-xl border bg-card shadow-sm transition hover:shadow-md`}
                   >
-                  {/* Image */}
-                  <div className="relative aspect-square shrink-0 overflow-hidden">
-                    {p.image_url ? (
-                      <img
-                        src={p.image_url}
-                        alt={p.name}
-                        className="h-full w-full object-cover transition duration-500 group-hover:scale-110"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center bg-muted text-xs text-muted-foreground">
-                        No Image
-                      </div>
-                    )}
-                  </div>
+                    {/* Image */}
+                    <div className="relative aspect-square shrink-0 overflow-hidden">
+                      {p.image_url ? (
+                        <img
+                          src={p.image_url}
+                          alt={p.name}
+                          className="h-full w-full object-cover transition duration-500 group-hover:scale-110"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-muted text-xs text-muted-foreground">
+                          No Image
+                        </div>
+                      )}
+                    </div>
 
-                  {/* Info */}
-                  <div className="flex flex-1 flex-col p-3">
-                    <h3 className="text-sm font-semibold leading-tight sm:text-base">{p.name}</h3>
+                    {/* Info */}
+                    <div className="flex flex-1 flex-col p-3">
+                      <h3 className="text-sm font-semibold leading-tight sm:text-base">{p.name}</h3>
 
-                    {sizes ? (
-                      <div className="mt-auto pt-2 space-y-1.5">
-                        {sizes.map((size) => {
-                          const calcPrice = Math.round(p.price * size.multiplier);
-                          const key = p.id + "|" + size.label;
-                          const isAdded = added === key;
-                          const cartItem = getCart().find(
-                            (c) => c.product_id === p.id && c.unit === size.label,
-                          );
-                          const cartKg = (cartItem?.quantity ?? 0) * size.multiplier;
-                          const outOfStock = p.stock != null && cartKg >= p.stock;
-                          const remaining = p.stock != null ? Math.max(0, p.stock - cartKg) : null;
-                          return (
-                            <div
-                              key={size.label}
-                              className={`flex items-center justify-between gap-1 rounded-lg border px-2 py-1.5 text-xs ${
-                                isAdded ? "border-green-400 bg-green-50" : ""
-                              }`}
-                            >
-                              <div className="min-w-0">
-                                <span className="font-medium">{size.label}</span>
-                                <span className="ml-1 text-muted-foreground">INR {calcPrice}</span>
-                                {remaining !== null && remaining <= 2 && (
-                                  <span
-                                    className={`ml-1 ${outOfStock ? "text-red-500" : "text-orange-500"}`}
-                                  >
-                                    {outOfStock
-                                      ? "Out"
-                                      : `${remaining % 1 === 0 ? remaining.toFixed(0) : remaining.toFixed(1)}kg`}
+                      {sizes ? (
+                        <div className="mt-auto pt-2 space-y-1.5">
+                          {sizes.map((size) => {
+                            const calcPrice = Math.round(p.price * size.multiplier);
+                            const key = p.id + "|" + size.label;
+                            const isAdded = added === key;
+                            const cartItem = getCart().find(
+                              (c) => c.product_id === p.id && c.unit === size.label,
+                            );
+                            const cartKg = (cartItem?.quantity ?? 0) * size.multiplier;
+                            const outOfStock = p.stock != null && cartKg >= p.stock;
+                            const remaining =
+                              p.stock != null ? Math.max(0, p.stock - cartKg) : null;
+                            return (
+                              <div
+                                key={size.label}
+                                className={`flex items-center justify-between gap-1 rounded-lg border px-2 py-1.5 text-xs ${
+                                  isAdded ? "border-green-400 bg-green-50" : ""
+                                }`}
+                              >
+                                <div className="min-w-0">
+                                  <span className="font-medium">{size.label}</span>
+                                  <span className="ml-1 text-muted-foreground">
+                                    INR {calcPrice}
                                   </span>
-                                )}
-                              </div>
-                              {ordersOpen ? (
-                                <button
-                                  onClick={() => add(p, size.label, calcPrice)}
-                                  disabled={outOfStock}
-                                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition ${
-                                    isAdded
-                                      ? "bg-green-600 text-white"
-                                      : outOfStock
-                                        ? "bg-gray-200 text-gray-400"
-                                        : "bg-primary text-primary-foreground active:scale-90"
-                                  }`}
-                                >
-                                  {isAdded ? (
-                                    <Check className="h-3 w-3" />
-                                  ) : outOfStock ? (
-                                    "X"
-                                  ) : (
+                                  {remaining !== null && remaining <= 2 && (
+                                    <span
+                                      className={`ml-1 ${outOfStock ? "text-red-500" : "text-orange-500"}`}
+                                    >
+                                      {outOfStock
+                                        ? "Out"
+                                        : `${remaining % 1 === 0 ? remaining.toFixed(0) : remaining.toFixed(1)}kg`}
+                                    </span>
+                                  )}
+                                </div>
+                                {ordersOpen ? (
+                                  <button
+                                    onClick={() => add(p, size.label, calcPrice)}
+                                    disabled={outOfStock}
+                                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition ${
+                                      isAdded
+                                        ? "bg-green-600 text-white"
+                                        : outOfStock
+                                          ? "bg-gray-200 text-gray-400"
+                                          : "bg-primary text-primary-foreground active:scale-90"
+                                    }`}
+                                  >
+                                    {isAdded ? (
+                                      <Check className="h-3 w-3" />
+                                    ) : outOfStock ? (
+                                      "X"
+                                    ) : (
+                                      <Plus className="h-3 w-3" />
+                                    )}
+                                  </button>
+                                ) : (
+                                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gray-200 text-gray-400">
                                     <Plus className="h-3 w-3" />
-                                  )}
-                                </button>
-                              ) : (
-                                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gray-200 text-gray-400">
-                                  <Plus className="h-3 w-3" />
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="mt-auto pt-2">
-                        {(() => {
-                          const cartItem = getCart().find(
-                            (c) => c.product_id === p.id && c.unit === p.unit,
-                          );
-                          const cartQty = cartItem?.quantity ?? 0;
-                          const outOfStock = p.stock != null && cartQty >= p.stock;
-                          const remaining = p.stock != null ? Math.max(0, p.stock - cartQty) : null;
-                          const unitDisplay =
-                            p.unit === "tray" ? "Tray" : p.unit === "dozen" ? "Dozen" : p.unit;
-                          return (
-                            <div className="flex items-center justify-between gap-2">
-                              <div>
-                                <p className="text-[10px] text-muted-foreground">
-                                  per {unitDisplay}
-                                </p>
-                                <span className="text-sm font-bold text-primary">
-                                  INR {Number(p.price).toFixed(0)}
-                                </span>
-                                {remaining !== null && remaining <= 2 && (
-                                  <span
-                                    className={`ml-1 text-[10px] ${outOfStock ? "text-red-500" : "text-orange-500"}`}
-                                  >
-                                    {outOfStock ? "Out" : `${remaining} left`}
                                   </span>
                                 )}
                               </div>
-                              {ordersOpen ? (
-                                <button
-                                  onClick={() => add(p, p.unit, Number(p.price))}
-                                  disabled={outOfStock}
-                                  className={`flex h-8 items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                                    added === p.id + "|" + p.unit
-                                      ? "bg-green-600 text-white"
-                                      : outOfStock
-                                        ? "bg-gray-200 text-gray-400"
-                                        : "bg-primary text-primary-foreground active:scale-95"
-                                  }`}
-                                >
-                                  {added === p.id + "|" + p.unit ? (
-                                    <>
-                                      <Check className="h-3 w-3" /> Added
-                                    </>
-                                  ) : outOfStock ? (
-                                    "Out"
-                                  ) : (
-                                    <>
-                                      <Plus className="h-3 w-3" /> Add
-                                    </>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="mt-auto pt-2">
+                          {(() => {
+                            const cartItem = getCart().find(
+                              (c) => c.product_id === p.id && c.unit === p.unit,
+                            );
+                            const cartQty = cartItem?.quantity ?? 0;
+                            const outOfStock = p.stock != null && cartQty >= p.stock;
+                            const remaining =
+                              p.stock != null ? Math.max(0, p.stock - cartQty) : null;
+                            const unitDisplay =
+                              p.unit === "tray" ? "Tray" : p.unit === "dozen" ? "Dozen" : p.unit;
+                            return (
+                              <div className="flex items-center justify-between gap-2">
+                                <div>
+                                  <p className="text-[10px] text-muted-foreground">
+                                    per {unitDisplay}
+                                  </p>
+                                  <span className="text-sm font-bold text-primary">
+                                    INR {Number(p.price).toFixed(0)}
+                                  </span>
+                                  {remaining !== null && remaining <= 2 && (
+                                    <span
+                                      className={`ml-1 text-[10px] ${outOfStock ? "text-red-500" : "text-orange-500"}`}
+                                    >
+                                      {outOfStock ? "Out" : `${remaining} left`}
+                                    </span>
                                   )}
-                                </button>
-                              ) : (
-                                <span className="flex h-8 items-center gap-1 rounded-lg bg-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-400">
-                                  <Plus className="h-3 w-3" /> Closed
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    )}
-                  </div>
+                                </div>
+                                {ordersOpen ? (
+                                  <button
+                                    onClick={() => add(p, p.unit, Number(p.price))}
+                                    disabled={outOfStock}
+                                    className={`flex h-8 items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                      added === p.id + "|" + p.unit
+                                        ? "bg-green-600 text-white"
+                                        : outOfStock
+                                          ? "bg-gray-200 text-gray-400"
+                                          : "bg-primary text-primary-foreground active:scale-95"
+                                    }`}
+                                  >
+                                    {added === p.id + "|" + p.unit ? (
+                                      <>
+                                        <Check className="h-3 w-3" /> Added
+                                      </>
+                                    ) : outOfStock ? (
+                                      "Out"
+                                    ) : (
+                                      <>
+                                        <Plus className="h-3 w-3" /> Add
+                                      </>
+                                    )}
+                                  </button>
+                                ) : (
+                                  <span className="flex h-8 items-center gap-1 rounded-lg bg-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-400">
+                                    <Plus className="h-3 w-3" /> Closed
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               );

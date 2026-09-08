@@ -21,6 +21,29 @@ export const adminUpdateProduct = createServerFn({ method: "POST" })
   })
   .handler(async ({ data }) => {
     const admin = await getAdminClient();
+
+    if (data.updates.priority !== undefined && data.updates.priority !== null) {
+      const { data: product } = await admin
+        .from("products")
+        .select("category")
+        .eq("id", data.id)
+        .single();
+      if (product) {
+        const { data: existing } = await admin
+          .from("products")
+          .select("id")
+          .eq("category", product.category)
+          .eq("priority", Number(data.updates.priority))
+          .neq("id", data.id)
+          .limit(1);
+        if (existing && existing.length > 0) {
+          throw new Error(
+            `Priority ${data.updates.priority} is already used by another product in "${product.category}"`,
+          );
+        }
+      }
+    }
+
     const { error } = await admin
       .from("products")
       .update(data.updates as never)
@@ -61,6 +84,21 @@ export const adminInsertProduct = createServerFn({ method: "POST" })
   })
   .handler(async ({ data }) => {
     const admin = await getAdminClient();
+
+    if (data.priority != null) {
+      const { data: existing } = await admin
+        .from("products")
+        .select("id")
+        .eq("category", data.category)
+        .eq("priority", data.priority)
+        .limit(1);
+      if (existing && existing.length > 0) {
+        throw new Error(
+          `Priority ${data.priority} is already used by another product in "${data.category}"`,
+        );
+      }
+    }
+
     const { error } = await admin.from("products").insert(data);
     if (error) throw new Error(error.message);
     return { success: true };
@@ -126,9 +164,16 @@ export const adminInsertCategory = createServerFn({ method: "POST" })
   .validator((data: unknown) => {
     const d = data as Record<string, unknown>;
     const name = String(d.name || "").trim();
-    const slug = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    const slug = name
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "");
     const priority = d.priority === undefined || d.priority === "" ? null : Number(d.priority);
-    if (priority !== undefined && priority !== null && (!Number.isInteger(priority) || priority < 1)) {
+    if (
+      priority !== undefined &&
+      priority !== null &&
+      (!Number.isInteger(priority) || priority < 1)
+    ) {
       throw new Error("Priority must be a positive whole number");
     }
     return { name, slug, priority, image_url: d.image_url ? String(d.image_url) : null };
@@ -149,8 +194,13 @@ export const adminUpdateCategory = createServerFn({ method: "POST" })
   .validator((data: unknown) => {
     const d = data as Record<string, unknown>;
     if (typeof d.id !== "string") throw new Error("Invalid category id");
-    const priority = d.priority === undefined ? undefined : d.priority === "" ? null : Number(d.priority);
-    if (priority !== undefined && priority !== null && (!Number.isInteger(priority) || priority < 1)) {
+    const priority =
+      d.priority === undefined ? undefined : d.priority === "" ? null : Number(d.priority);
+    if (
+      priority !== undefined &&
+      priority !== null &&
+      (!Number.isInteger(priority) || priority < 1)
+    ) {
       throw new Error("Priority must be a positive whole number");
     }
     return {
@@ -175,7 +225,10 @@ export const adminInsertSubcategory = createServerFn({ method: "POST" })
     const d = data as Record<string, unknown>;
     const name = String(d.name || "").trim();
     const category_slug = String(d.category_slug || "").trim();
-    const slug = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    const slug = name
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "");
     const priority = d.priority === undefined || d.priority === "" ? null : Number(d.priority);
     if (!name || !category_slug) throw new Error("Category and subcategory name are required");
     if (priority !== null && (!Number.isInteger(priority) || priority < 1)) {
@@ -185,7 +238,70 @@ export const adminInsertSubcategory = createServerFn({ method: "POST" })
   })
   .handler(async ({ data }) => {
     const admin = await getAdminClient();
+
+    if (data.priority != null) {
+      const { data: existing } = await admin
+        .from("subcategories")
+        .select("id")
+        .eq("category_slug", data.category_slug)
+        .eq("priority", data.priority)
+        .limit(1);
+      if (existing && existing.length > 0) {
+        throw new Error(
+          `Priority ${data.priority} is already used by another subcategory in "${data.category_slug}"`,
+        );
+      }
+    }
+
     const { error } = await admin.from("subcategories").insert(data);
+    if (error) throw new Error(error.message);
+    return { success: true };
+  });
+
+export const adminUpdateSubcategory = createServerFn({ method: "POST" })
+  .validator((data: unknown) => {
+    const d = data as Record<string, unknown>;
+    const id = String(d.id || "").trim();
+    if (!id) throw new Error("Subcategory ID is required");
+    const updates: Record<string, unknown> = {};
+    if (d.priority !== undefined) {
+      const v = d.priority === "" || d.priority === null ? null : Number(d.priority);
+      if (v !== null && (!Number.isInteger(v) || v < 1)) {
+        throw new Error("Priority must be a positive whole number");
+      }
+      updates.priority = v;
+    }
+    return { id, updates };
+  })
+  .handler(async ({ data }) => {
+    const admin = await getAdminClient();
+
+    if (data.updates.priority !== undefined && data.updates.priority !== null) {
+      const { data: sub } = await admin
+        .from("subcategories")
+        .select("category_slug")
+        .eq("id", data.id)
+        .single();
+      if (sub) {
+        const { data: existing } = await admin
+          .from("subcategories")
+          .select("id")
+          .eq("category_slug", sub.category_slug)
+          .eq("priority", Number(data.updates.priority))
+          .neq("id", data.id)
+          .limit(1);
+        if (existing && existing.length > 0) {
+          throw new Error(
+            `Priority ${data.updates.priority} is already used by another subcategory in "${sub.category_slug}"`,
+          );
+        }
+      }
+    }
+
+    const { error } = await admin
+      .from("subcategories")
+      .update(data.updates as never)
+      .eq("id", data.id);
     if (error) throw new Error(error.message);
     return { success: true };
   });

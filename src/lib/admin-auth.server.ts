@@ -1,4 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
+import { timingSafeEqual } from "crypto";
+
+function safeCompare(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+}
 
 export const validateAdminLogin = createServerFn({ method: "POST" })
   .validator((data: unknown) => {
@@ -10,15 +16,15 @@ export const validateAdminLogin = createServerFn({ method: "POST" })
     return { adminId: d.adminId, password: d.password };
   })
   .handler(async ({ data }) => {
-    const adminId = process.env.ADMIN_ID || "manapalle";
+    const adminId = process.env.ADMIN_ID;
     const adminPassword = process.env.ADMIN_PASSWORD;
 
-    if (!adminPassword) {
-      console.error("ADMIN_PASSWORD environment variable is not set");
+    if (!adminId || !adminPassword) {
+      console.error("ADMIN_ID and ADMIN_PASSWORD environment variables must be set");
       return { valid: false, error: "Server configuration error" };
     }
 
-    const valid = data.adminId === adminId && data.password === adminPassword;
+    const valid = safeCompare(data.adminId, adminId) && safeCompare(data.password, adminPassword);
     return {
       valid,
       error: valid ? undefined : "Invalid admin credentials",

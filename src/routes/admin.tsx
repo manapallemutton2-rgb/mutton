@@ -58,6 +58,7 @@ import {
   adminUpdateCategory,
   adminDeleteCategory,
   adminInsertSubcategory,
+  adminUpdateSubcategory,
   adminDeleteSubcategory,
   adminRemoveProductImage,
   adminDeleteOrder,
@@ -164,22 +165,29 @@ function AdminPage() {
       <main className="mx-auto max-w-6xl px-3 py-4 sm:px-4 sm:py-6">
         <div className="no-print mb-5 flex gap-1 overflow-x-auto border-b sm:gap-2">
           {(
-            ["stats", "orders", "items", "products", "categories", "subcategories", "communities", "settings"] as Tab[]
-          ).map(
-            (t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`whitespace-nowrap px-3 py-2.5 text-sm font-medium capitalize transition sm:px-5 sm:py-3 sm:text-base ${
-                  tab === t
-                    ? "border-b-2 border-primary text-primary"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {t}
-              </button>
-            ),
-          )}
+            [
+              "stats",
+              "orders",
+              "items",
+              "products",
+              "categories",
+              "subcategories",
+              "communities",
+              "settings",
+            ] as Tab[]
+          ).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`whitespace-nowrap px-3 py-2.5 text-sm font-medium capitalize transition sm:px-5 sm:py-3 sm:text-base ${
+                tab === t
+                  ? "border-b-2 border-primary text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {t}
+            </button>
+          ))}
         </div>
         {tab === "stats" && <StatsTab />}
         {tab === "orders" && <OrdersTab />}
@@ -592,11 +600,11 @@ function StatsTab() {
                 />
                 <Line
                   type="monotone"
-                  dataKey="yabe"
+                  dataKey="other"
                   stroke="#6b7280"
                   strokeWidth={2}
                   dot={false}
-                  name="yabe"
+                  name="Other"
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -1070,13 +1078,13 @@ function ItemSalesTab() {
                   {ps.kgSold % 1 === 0 ? ps.kgSold.toFixed(0) : ps.kgSold.toFixed(1)}
                 </div>
               </div>
-              <div className="rounded-lg bg-amber/5 p-3 text-center">
+              <div className="rounded-lg bg-amber-50 p-3 text-center">
                 <div className="text-[10px] font-medium text-amber-700 uppercase tracking-wider">
                   Pieces
                 </div>
                 <div className="text-lg font-bold text-amber-700">{ps.pcsSold || "-"}</div>
               </div>
-              <div className="rounded-lg bg-green/5 p-3 text-center">
+              <div className="rounded-lg bg-green-50 p-3 text-center">
                 <div className="text-[10px] font-medium text-green-700 uppercase tracking-wider">
                   Orders
                 </div>
@@ -1519,7 +1527,19 @@ function OrdersTab() {
     const buf = buzzerBufferRef.current;
     if (ctx && buf && ctx.state !== "closed") {
       if (ctx.state === "suspended") {
-        ctx.resume();
+        ctx
+          .resume()
+          .then(() => {
+            try {
+              const source = ctx.createBufferSource();
+              source.buffer = buf;
+              source.connect(ctx.destination);
+              source.start(0);
+            } catch {
+              // fallback below
+            }
+          })
+          .catch(() => {});
         return;
       }
       const source = ctx.createBufferSource();
@@ -2462,15 +2482,17 @@ function ProductsTab() {
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [newPriority, setNewPriority] = useState("");
+  const [pendingPriorities, setPendingPriorities] = useState<Record<string, string>>({});
 
   const { data: products = [], isLoading } = useQuery<Product[]>({
     queryKey: ["admin", "products"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, unit, price, image_url, active, category, subcategory, created_at, stock, priority")
-        .order("priority", { ascending: true, nullsFirst: false })
-        .order("name");
+        .select(
+          "id, name, unit, price, image_url, active, category, subcategory, created_at, stock, priority",
+        )
+        .order("priority", { ascending: true, nullsFirst: false });
       if (error) {
         console.error("Failed to load products:", error);
         return [];
@@ -2491,7 +2513,7 @@ function ProductsTab() {
         return [];
       }
       return ((data as unknown as Category[]) || []).sort(
-        (a, b) => (a.priority ?? Number.MAX_SAFE_INTEGER) - (b.priority ?? Number.MAX_SAFE_INTEGER) || a.name.localeCompare(b.name),
+        (a, b) => (a.priority ?? Number.MAX_SAFE_INTEGER) - (b.priority ?? Number.MAX_SAFE_INTEGER),
       );
     },
     staleTime: 300_000,
@@ -2508,8 +2530,7 @@ function ProductsTab() {
       const { data, error } = await supabase
         .from("subcategories")
         .select("id, category_slug, name, slug, priority")
-        .order("priority", { ascending: true, nullsFirst: false })
-        .order("name");
+        .order("priority", { ascending: true, nullsFirst: false });
       if (error) return [];
       return (data as Subcategory[]) || [];
     },
@@ -2519,8 +2540,10 @@ function ProductsTab() {
   const subcategoryOptions = subcategories.filter((item) => item.category_slug === category);
 
   useEffect(() => {
-    if (categories.length > 0 && !categories.some((item) => item.slug === category)) {
-      setCategory(categories[0].slug);
+    if (category && categories.length > 0 && !categories.some((item) => item.slug === category)) {
+      setCategory("");
+      setNewPriority("");
+      setSubcategory("");
     }
   }, [categories, category]);
 
@@ -2568,6 +2591,9 @@ function ProductsTab() {
       queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
       queryClient.invalidateQueries({ queryKey: ["products", "active"] });
     },
+    onError: (err: Error) => {
+      alert(err.message || "Failed to add product");
+    },
   });
 
   const toggleMutation = useMutation({
@@ -2613,6 +2639,9 @@ function ProductsTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
       queryClient.invalidateQueries({ queryKey: ["products", "active"] });
+    },
+    onError: (err: Error) => {
+      alert(err.message || "Failed to update product");
     },
   });
 
@@ -2719,21 +2748,25 @@ function ProductsTab() {
           placeholder="Product name"
           className="rounded-xl border bg-background px-4 py-4 text-base"
         />
-          <select
+        <select
           value={category}
-          onChange={(e) => setCategory(e.target.value)}
-            required
+          onChange={(e) => {
+            setCategory(e.target.value);
+            setNewPriority("");
+            setSubcategory("");
+          }}
+          required
           className="rounded-xl border bg-background px-4 py-4 text-base"
-          >
-            <option value="" disabled>
-              Select category
+        >
+          <option value="" disabled>
+            Select category
+          </option>
+          {categoryOptions.map((item) => (
+            <option key={item.slug} value={item.slug}>
+              {item.name}
             </option>
-            {categoryOptions.map((item) => (
-              <option key={item.slug} value={item.slug}>
-                {item.name}
-              </option>
-            ))}
-          </select>
+          ))}
+        </select>
         <select
           value={subcategory}
           onChange={(e) => setSubcategory(e.target.value)}
@@ -2774,14 +2807,16 @@ function ProductsTab() {
           inputMode="decimal"
           className="rounded-xl border bg-background px-4 py-4 text-base"
         />
-        <input
-          value={newPriority}
-          onChange={(e) => setNewPriority(e.target.value)}
-          placeholder="Priority (1 = first)"
-          type="number"
-          min="1"
-          className="rounded-xl border bg-background px-4 py-4 text-base"
-        />
+        {category && (
+          <input
+            value={newPriority}
+            onChange={(e) => setNewPriority(e.target.value)}
+            placeholder={`Priority in ${categoryOptions.find((c) => c.slug === category)?.name || category} (1 = first)`}
+            type="number"
+            min="1"
+            className="rounded-xl border bg-background px-4 py-4 text-base"
+          />
+        )}
         <input
           value={imageUrl}
           onChange={(e) => setImageUrl(e.target.value)}
@@ -2822,10 +2857,11 @@ function ProductsTab() {
               <th className="p-3">Image</th>
               <th className="p-3">Name</th>
               <th className="p-3">Category</th>
+              <th className="p-3">Subcategory</th>
               <th className="p-3">Unit</th>
               <th className="p-3">Price</th>
               <th className="p-3">Stock</th>
-              <th className="p-3">Priority</th>
+              {filterCategory !== "all" && <th className="p-3">Priority</th>}
               <th className="p-3">Active</th>
               <th className="p-3">Image Options</th>
               <th className="p-3 text-right">Actions</th>
@@ -2932,25 +2968,52 @@ function ProductsTab() {
                     className="w-28 rounded-xl border bg-background px-3 py-2 text-base"
                   />
                 </td>
-                <td className="p-3">
-                  <input
-                    defaultValue={p.priority ?? ""}
-                    onBlur={(e) => {
-                      const v = e.target.value.trim();
-                      if (v === "" || v === (p.priority?.toString() ?? "")) return;
-                      const num = Number(v);
-                      if (v !== "" && (isNaN(num) || num < 1)) return;
-                      updateProductMutation.mutate({
-                        id: p.id,
-                        updates: { priority: v === "" ? null : num },
-                      });
-                    }}
-                    placeholder="-"
-                    type="number"
-                    min="1"
-                    className="w-20 rounded-xl border bg-background px-3 py-2 text-base"
-                  />
-                </td>
+                {filterCategory !== "all" && (
+                  <td className="p-3">
+                    <div className="flex items-center gap-1">
+                      <input
+                        defaultValue={p.priority ?? ""}
+                        onChange={(e) => {
+                          setPendingPriorities((s) => ({ ...s, [p.id]: e.target.value }));
+                        }}
+                        placeholder="-"
+                        type="number"
+                        min="1"
+                        className="w-20 rounded-xl border bg-background px-3 py-2 text-base"
+                      />
+                      {(pendingPriorities[p.id] !== undefined ||
+                        pendingPriorities[p.id] !== (p.priority?.toString() ?? "")) &&
+                        (() => {
+                          const v = (pendingPriorities[p.id] ?? "").trim();
+                          const current = p.priority?.toString() ?? "";
+                          const changed = v !== current;
+                          if (!changed) return null;
+                          const num = Number(v);
+                          const valid = v === "" || (num >= 1 && Number.isInteger(num));
+                          return (
+                            <button
+                              onClick={() => {
+                                if (!valid) return;
+                                updateProductMutation.mutate({
+                                  id: p.id,
+                                  updates: { priority: v === "" ? null : num },
+                                });
+                                setPendingPriorities((s) => {
+                                  const next = { ...s };
+                                  delete next[p.id];
+                                  return next;
+                                });
+                              }}
+                              disabled={!valid}
+                              className="rounded-lg bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
+                            >
+                              Save
+                            </button>
+                          );
+                        })()}
+                    </div>
+                  </td>
+                )}
                 <td className="p-3">
                   <button
                     onClick={() => toggle(p)}
@@ -3031,7 +3094,7 @@ function ProductsTab() {
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
                     {p.category.charAt(0).toUpperCase() + p.category.slice(1)}
                   </span>
-                  {p.priority && (
+                  {filterCategory !== "all" && p.priority && (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber/10 text-amber-700 font-medium">
                       Priority: {p.priority}
                     </span>
@@ -3082,28 +3145,53 @@ function ProductsTab() {
             </div>
 
             {/* Priority Row */}
-            <div className="rounded-lg bg-muted/50 p-3 mb-3">
-              <label className="block text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1">
-                Display Priority (1 = First)
-              </label>
-              <input
-                defaultValue={p.priority ?? ""}
-                onBlur={(e) => {
-                  const v = e.target.value.trim();
-                  if (v === "" || v === (p.priority?.toString() ?? "")) return;
-                  const num = Number(v);
-                  if (v !== "" && (isNaN(num) || num < 1)) return;
-                  updateProductMutation.mutate({
-                    id: p.id,
-                    updates: { priority: v === "" ? null : num },
-                  });
-                }}
-                placeholder="Auto"
-                type="number"
-                min="1"
-                className="w-full rounded bg-background px-2 py-1.5 text-base font-medium text-center"
-              />
-            </div>
+            {filterCategory !== "all" && (
+              <div className="rounded-lg bg-muted/50 p-3 mb-3">
+                <label className="block text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1">
+                  Display Priority (1 = First)
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    defaultValue={p.priority ?? ""}
+                    onChange={(e) => {
+                      setPendingPriorities((s) => ({ ...s, [p.id]: e.target.value }));
+                    }}
+                    placeholder="Auto"
+                    type="number"
+                    min="1"
+                    className="flex-1 rounded bg-background px-2 py-1.5 text-base font-medium text-center"
+                  />
+                  {(() => {
+                    const v = (pendingPriorities[p.id] ?? "").trim();
+                    const current = p.priority?.toString() ?? "";
+                    const changed = v !== current;
+                    if (!changed) return null;
+                    const num = Number(v);
+                    const valid = v === "" || (num >= 1 && Number.isInteger(num));
+                    return (
+                      <button
+                        onClick={() => {
+                          if (!valid) return;
+                          updateProductMutation.mutate({
+                            id: p.id,
+                            updates: { priority: v === "" ? null : num },
+                          });
+                          setPendingPriorities((s) => {
+                            const next = { ...s };
+                            delete next[p.id];
+                            return next;
+                          });
+                        }}
+                        disabled={!valid}
+                        className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
+                      >
+                        Save
+                      </button>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
 
             {/* Category Selector */}
             <div className="mb-3">
@@ -3202,6 +3290,7 @@ function CategoriesTab() {
   const [priority, setPriority] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [pendingPriorities, setPendingPriorities] = useState<Record<string, string>>({});
 
   const { data: categories = [], isLoading } = useQuery<Category[]>({
     queryKey: ["admin", "categories"],
@@ -3214,7 +3303,7 @@ function CategoriesTab() {
         return [];
       }
       return ((data as unknown as Category[]) || []).sort(
-        (a, b) => (a.priority ?? Number.MAX_SAFE_INTEGER) - (b.priority ?? Number.MAX_SAFE_INTEGER) || a.name.localeCompare(b.name),
+        (a, b) => (a.priority ?? Number.MAX_SAFE_INTEGER) - (b.priority ?? Number.MAX_SAFE_INTEGER),
       );
     },
     staleTime: 300_000,
@@ -3229,12 +3318,25 @@ function CategoriesTab() {
       setImageUrl("");
       queryClient.invalidateQueries({ queryKey: ["admin", "categories"] });
     },
+    onError: (err: Error) => {
+      alert(err.message || "Failed to add category");
+    },
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, priority, image_url }: { id: string; priority?: string; image_url?: string | null }) =>
-      adminUpdateCategory({ data: { id, priority, image_url } }),
+    mutationFn: ({
+      id,
+      priority,
+      image_url,
+    }: {
+      id: string;
+      priority?: string;
+      image_url?: string | null;
+    }) => adminUpdateCategory({ data: { id, priority, image_url } }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "categories"] }),
+    onError: (err: Error) => {
+      alert(err.message || "Failed to update category");
+    },
   });
 
   const deleteMutation = useMutation({
@@ -3277,7 +3379,10 @@ function CategoriesTab() {
 
   return (
     <div className="space-y-5">
-      <form onSubmit={add} className="flex flex-col gap-3 rounded-xl border bg-card p-4 sm:flex-row sm:p-6">
+      <form
+        onSubmit={add}
+        className="flex flex-col gap-3 rounded-xl border bg-card p-4 sm:flex-row sm:p-6"
+      >
         <input
           value={name}
           onChange={(event) => setName(event.target.value)}
@@ -3310,7 +3415,9 @@ function CategoriesTab() {
       </form>
 
       {isLoading ? (
-        <div className="rounded-xl border bg-card p-6 text-muted-foreground">Loading categories...</div>
+        <div className="rounded-xl border bg-card p-6 text-muted-foreground">
+          Loading categories...
+        </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border bg-card">
           <table className="w-full text-base">
@@ -3360,23 +3467,45 @@ function CategoriesTab() {
                   </td>
                   <td className="p-3 text-muted-foreground">{item.slug}</td>
                   <td className="p-3">
-                    <input
-                      defaultValue={item.priority ?? ""}
-                      type="number"
-                      min="1"
-                      step="1"
-                      placeholder="Auto"
-                      onBlur={(event) => {
-                        const value = event.target.value.trim();
-                        if (value === String(item.priority ?? "")) return;
-                        if (value !== "" && (!Number.isInteger(Number(value)) || Number(value) < 1)) {
-                          event.target.value = item.priority?.toString() || "";
-                          return;
-                        }
-                        updateMutation.mutate({ id: item.id, priority: value });
-                      }}
-                      className="w-28 rounded-lg border bg-background px-3 py-2"
-                    />
+                    <div className="flex items-center gap-1">
+                      <input
+                        defaultValue={item.priority ?? ""}
+                        type="number"
+                        min="1"
+                        step="1"
+                        placeholder="Auto"
+                        onChange={(event) => {
+                          setPendingPriorities((s) => ({ ...s, [item.id]: event.target.value }));
+                        }}
+                        className="w-28 rounded-lg border bg-background px-3 py-2"
+                      />
+                      {(() => {
+                        const v = (pendingPriorities[item.id] ?? "").trim();
+                        const current = item.priority?.toString() ?? "";
+                        const changed = v !== current;
+                        if (!changed) return null;
+                        const num = Number(v);
+                        const valid = v === "" || (num >= 1 && Number.isInteger(num));
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!valid) return;
+                              updateMutation.mutate({ id: item.id, priority: v });
+                              setPendingPriorities((s) => {
+                                const next = { ...s };
+                                delete next[item.id];
+                                return next;
+                              });
+                            }}
+                            disabled={!valid}
+                            className="rounded-lg bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
+                          >
+                            Save
+                          </button>
+                        );
+                      })()}
+                    </div>
                   </td>
                   <td className="p-3 text-right">
                     <button
@@ -3406,14 +3535,17 @@ function SubcategoriesTab() {
   const [name, setName] = useState("");
   const [categorySlug, setCategorySlug] = useState("");
   const [priority, setPriority] = useState("");
+  const [pendingPriorities, setPendingPriorities] = useState<Record<string, string>>({});
 
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ["admin", "categories"],
     queryFn: async () => {
-      const { data, error } = await categoryQueryClient.from("categories").select("id, name, slug, priority");
+      const { data, error } = await categoryQueryClient
+        .from("categories")
+        .select("id, name, slug, priority");
       if (error) return [];
       return ((data as unknown as Category[]) || []).sort(
-        (a, b) => (a.priority ?? Number.MAX_SAFE_INTEGER) - (b.priority ?? Number.MAX_SAFE_INTEGER) || a.name.localeCompare(b.name),
+        (a, b) => (a.priority ?? Number.MAX_SAFE_INTEGER) - (b.priority ?? Number.MAX_SAFE_INTEGER),
       );
     },
     staleTime: 300_000,
@@ -3425,8 +3557,7 @@ function SubcategoriesTab() {
       const { data, error } = await supabase
         .from("subcategories")
         .select("id, category_slug, name, slug, priority")
-        .order("priority", { ascending: true, nullsFirst: false })
-        .order("name");
+        .order("priority", { ascending: true, nullsFirst: false });
       if (error) return [];
       return (data as Subcategory[]) || [];
     },
@@ -3434,16 +3565,29 @@ function SubcategoriesTab() {
   });
 
   const addMutation = useMutation({
-    mutationFn: () => adminInsertSubcategory({ data: { name, category_slug: categorySlug, priority } }),
+    mutationFn: () =>
+      adminInsertSubcategory({ data: { name, category_slug: categorySlug, priority } }),
     onSuccess: () => {
       setName("");
       setPriority("");
       queryClient.invalidateQueries({ queryKey: ["admin", "subcategories"] });
     },
+    onError: (err: Error) => {
+      alert(err.message || "Failed to add subcategory");
+    },
   });
   const deleteMutation = useMutation({
     mutationFn: (id: string) => adminDeleteSubcategory({ data: { id } }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "subcategories"] }),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, priority }: { id: string; priority: string }) =>
+      adminUpdateSubcategory({ data: { id, priority } }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "subcategories"] }),
+    onError: (err: Error) => {
+      alert(err.message || "Failed to update subcategory");
+    },
   });
 
   return (
@@ -3455,21 +3599,126 @@ function SubcategoriesTab() {
         }}
         className="flex flex-col gap-3 rounded-xl border bg-card p-4 sm:flex-row sm:p-6"
       >
-        <select value={categorySlug} onChange={(event) => setCategorySlug(event.target.value)} required className="rounded-xl border bg-background px-4 py-3">
-          <option value="" disabled>Select parent category</option>
-          {categories.map((item) => <option key={item.slug} value={item.slug}>{item.name}</option>)}
+        <select
+          value={categorySlug}
+          onChange={(event) => {
+            setCategorySlug(event.target.value);
+            setPriority("");
+          }}
+          required
+          className="rounded-xl border bg-background px-4 py-3"
+        >
+          <option value="" disabled>
+            Select parent category
+          </option>
+          {categories.map((item) => (
+            <option key={item.slug} value={item.slug}>
+              {item.name}
+            </option>
+          ))}
         </select>
-        <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Subcategory name" className="min-w-0 flex-1 rounded-xl border bg-background px-4 py-3" />
-        <input value={priority} onChange={(event) => setPriority(event.target.value)} placeholder="Priority" type="number" min="1" className="rounded-xl border bg-background px-4 py-3 sm:w-32" />
-        <button type="submit" disabled={!name.trim() || !categorySlug || addMutation.isPending} className="rounded-xl bg-primary px-5 py-3 font-medium text-primary-foreground disabled:opacity-50">
+        <input
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          placeholder="Subcategory name"
+          className="min-w-0 flex-1 rounded-xl border bg-background px-4 py-3"
+        />
+        {categorySlug && (
+          <input
+            value={priority}
+            onChange={(event) => setPriority(event.target.value)}
+            placeholder={`Priority in ${categories.find((c) => c.slug === categorySlug)?.name || categorySlug} (1 = first)`}
+            type="number"
+            min="1"
+            className="rounded-xl border bg-background px-4 py-3 sm:w-40"
+          />
+        )}
+        <button
+          type="submit"
+          disabled={!name.trim() || !categorySlug || addMutation.isPending}
+          className="rounded-xl bg-primary px-5 py-3 font-medium text-primary-foreground disabled:opacity-50"
+        >
           {addMutation.isPending ? "Adding..." : "Add Subcategory"}
         </button>
       </form>
-      {isLoading ? <div className="rounded-xl border bg-card p-6 text-muted-foreground">Loading subcategories...</div> : (
+      {isLoading ? (
+        <div className="rounded-xl border bg-card p-6 text-muted-foreground">
+          Loading subcategories...
+        </div>
+      ) : (
         <div className="overflow-x-auto rounded-xl border bg-card">
           <table className="w-full text-base">
-            <thead className="bg-muted text-left"><tr><th className="p-3">Subcategory</th><th className="p-3">Category</th><th className="p-3">Priority</th><th className="p-3 text-right">Actions</th></tr></thead>
-            <tbody>{subcategories.map((item) => <tr key={item.id} className="border-t"><td className="p-3 font-medium">{item.name}</td><td className="p-3">{categories.find((category) => category.slug === item.category_slug)?.name || item.category_slug}</td><td className="p-3">{item.priority ?? "Auto"}</td><td className="p-3 text-right"><button type="button" onClick={() => { if (confirm(`Delete ${item.name}?`)) deleteMutation.mutate(item.id); }} className="px-2 py-2 text-sm font-medium text-destructive hover:underline">Delete</button></td></tr>)}</tbody>
+            <thead className="bg-muted text-left">
+              <tr>
+                <th className="p-3">Subcategory</th>
+                <th className="p-3">Category</th>
+                <th className="p-3">Priority</th>
+                <th className="p-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {subcategories.map((item) => (
+                <tr key={item.id} className="border-t">
+                  <td className="p-3 font-medium">{item.name}</td>
+                  <td className="p-3">
+                    {categories.find((category) => category.slug === item.category_slug)?.name ||
+                      item.category_slug}
+                  </td>
+                  <td className="p-3">
+                    <div className="flex items-center gap-1">
+                      <input
+                        defaultValue={item.priority ?? ""}
+                        type="number"
+                        min="1"
+                        step="1"
+                        placeholder="Auto"
+                        onChange={(event) => {
+                          setPendingPriorities((s) => ({ ...s, [item.id]: event.target.value }));
+                        }}
+                        className="w-24 rounded-lg border bg-background px-3 py-2 text-sm"
+                      />
+                      {(() => {
+                        const v = (pendingPriorities[item.id] ?? "").trim();
+                        const current = item.priority?.toString() ?? "";
+                        const changed = v !== current;
+                        if (!changed) return null;
+                        const num = Number(v);
+                        const valid = v === "" || (num >= 1 && Number.isInteger(num));
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!valid) return;
+                              updateMutation.mutate({ id: item.id, priority: v });
+                              setPendingPriorities((s) => {
+                                const next = { ...s };
+                                delete next[item.id];
+                                return next;
+                              });
+                            }}
+                            disabled={!valid}
+                            className="rounded-lg bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
+                          >
+                            Save
+                          </button>
+                        );
+                      })()}
+                    </div>
+                  </td>
+                  <td className="p-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm(`Delete ${item.name}?`)) deleteMutation.mutate(item.id);
+                      }}
+                      className="px-2 py-2 text-sm font-medium text-destructive hover:underline"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
           </table>
         </div>
       )}

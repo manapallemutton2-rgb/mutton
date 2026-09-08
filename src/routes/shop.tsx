@@ -70,38 +70,35 @@ function ShopPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, unit, price, image_url, active, category, stock, priority");
+        .select("id, name, unit, price, image_url, active, category, stock, priority")
+        .eq("active", true);
       if (error) {
         console.error("Failed to load products:", error);
         return [];
       }
-      const result = (data as Product[]) || [];
-      result.sort((a, b) => {
+      return ((data as Product[]) || []).sort((a, b) => {
         const pa = a.priority ?? 9999;
         const pb = b.priority ?? 9999;
-        if (pa !== pb) return pa - pb;
-        return a.name.localeCompare(b.name);
+        return pa - pb;
       });
-      return result;
     },
     staleTime: 60_000,
   });
 
-  const { data: publicCategories = [], isLoading: loadingCategories } =
-    useQuery<PublicCategory[]>({
-      queryKey: ["categories", "public"],
-      queryFn: async () => {
-        const { data, error } = await publicCategoryQueryClient
-          .from("categories")
-          .select("name, slug, image_url, priority");
-        if (error) {
-          console.error("Failed to load public categories:", error);
-          return [];
-        }
-        return (data as unknown as PublicCategory[]) || [];
-      },
-      staleTime: 60_000,
-    });
+  const { data: publicCategories = [], isLoading: loadingCategories } = useQuery<PublicCategory[]>({
+    queryKey: ["categories", "public"],
+    queryFn: async () => {
+      const { data, error } = await publicCategoryQueryClient
+        .from("categories")
+        .select("name, slug, image_url, priority");
+      if (error) {
+        console.error("Failed to load public categories:", error);
+        return [];
+      }
+      return (data as unknown as PublicCategory[]) || [];
+    },
+    staleTime: 60_000,
+  });
 
   const categories = Array.from(
     new Set([
@@ -115,8 +112,7 @@ function ShopPage() {
       const bCategory = publicCategories.find((category) => category.slug === b);
       return (
         (aCategory?.priority ?? Number.MAX_SAFE_INTEGER) -
-          (bCategory?.priority ?? Number.MAX_SAFE_INTEGER) ||
-        (aCategory?.name || a).localeCompare(bCategory?.name || b)
+        (bCategory?.priority ?? Number.MAX_SAFE_INTEGER)
       );
     });
   const categoryCounts = categories.reduce(
@@ -192,8 +188,8 @@ function ShopPage() {
                   className="mt-3 text-xs sm:mt-4 sm:text-base lg:text-lg"
                   style={{ color: "#6B4630" }}
                 >
-                  100% fresh packed products, cut by hand and delivered
-                  straight from Manapalle village to your kitchen.
+                  100% fresh packed products, cut by hand and delivered straight from Manapalle
+                  village to your kitchen.
                 </p>
               </div>
               <div className="shrink-0">

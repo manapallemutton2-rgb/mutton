@@ -161,7 +161,11 @@ export function AppHeader({ title }: { title?: string }) {
               onClick={() => setMenuOpen(!menuOpen)}
               className="flex items-center rounded-lg border border-white/20 bg-white/10 p-1.5 backdrop-blur-sm transition-colors hover:bg-white/20"
             >
-              {menuOpen ? <X className="h-4 w-4 text-white" /> : <Menu className="h-4 w-4 text-white" />}
+              {menuOpen ? (
+                <X className="h-4 w-4 text-white" />
+              ) : (
+                <Menu className="h-4 w-4 text-white" />
+              )}
             </button>
           </div>
         )}
@@ -170,7 +174,11 @@ export function AppHeader({ title }: { title?: string }) {
             onClick={() => setMenuOpen(!menuOpen)}
             className="flex items-center rounded-lg border border-white/20 bg-white/10 p-2 backdrop-blur-sm transition-colors hover:bg-white/20 md:hidden"
           >
-            {menuOpen ? <X className="h-5 w-5 text-white" /> : <Menu className="h-5 w-5 text-white" />}
+            {menuOpen ? (
+              <X className="h-5 w-5 text-white" />
+            ) : (
+              <Menu className="h-5 w-5 text-white" />
+            )}
           </button>
         )}
 
@@ -380,7 +388,9 @@ export function AppHeader({ title }: { title?: string }) {
                         </table>
                         <div className="mt-2 flex justify-between border-t pt-2 text-sm font-bold">
                           <span>Total</span>
-                          <span className="text-primary">INR {Math.round(Number(order.total))}</span>
+                          <span className="text-primary">
+                            INR {Math.round(Number(order.total))}
+                          </span>
                         </div>
                       </div>
                     )}

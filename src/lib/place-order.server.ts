@@ -73,21 +73,17 @@ export const placeOrderWithStockCheck = createServerFn({ method: "POST" })
 
     const { error: iErr } = await admin.from("order_items").insert(orderItems);
     if (iErr) {
-      // Rollback: delete order (cascade deletes order_items)
       await admin.from("orders").delete().eq("id", createdOrder.id);
       throw new Error(iErr.message);
     }
 
-    // 3. Atomically deduct stock for each item (only if stock IS NOT NULL)
-    // Convert order quantity to product's stock unit before deducting
+    // 3. Atomically deduct stock for each item
     const UNIT_TO_KG: Record<string, number> = {
       "500g": 0.5,
       "750g": 0.75,
       "1kg": 1,
       kg: 1,
     };
-
-    const deducted: { product_id: string; quantity: number }[] = [];
 
     const callRpc = (fn: string, params: Record<string, unknown>) =>
       (
@@ -99,8 +95,10 @@ export const placeOrderWithStockCheck = createServerFn({ method: "POST" })
         }
       ).rpc(fn, params);
 
+    // Pre-convert all quantities and validate stock availability before deducting
+    const convertedItems: { product_id: string; product_name: string; convertedQty: number }[] = [];
+
     for (const item of items) {
-      // Fetch the product's unit to know how to convert quantity
       const { data: product } = await admin
         .from("products")
         .select("unit")
@@ -109,13 +107,22 @@ export const placeOrderWithStockCheck = createServerFn({ method: "POST" })
 
       const productUnit = product?.unit || "kg";
       const isPiece = productUnit === "piece" || productUnit === "dozen" || productUnit === "tray";
-      const convertedQty = isPiece
-        ? item.quantity
-        : item.quantity * (UNIT_TO_KG[item.unit] ?? 1);
+      const convertedQty = isPiece ? item.quantity : item.quantity * (UNIT_TO_KG[item.unit] ?? 1);
 
+      convertedItems.push({
+        product_id: item.product_id,
+        product_name: item.product_name,
+        convertedQty,
+      });
+    }
+
+    // Deduct stock one by one — if any fails, restore all previously deducted
+    const deducted: { product_id: string; quantity: number }[] = [];
+
+    for (const ci of convertedItems) {
       const { data: updated, error: sErr } = await callRpc("deduct_product_stock", {
-        p_product_id: item.product_id,
-        p_quantity: convertedQty,
+        p_product_id: ci.product_id,
+        p_quantity: ci.convertedQty,
       });
 
       if (sErr) {
@@ -140,13 +147,13 @@ export const placeOrderWithStockCheck = createServerFn({ method: "POST" })
           });
         }
         await admin.from("orders").delete().eq("id", createdOrder.id);
-        const productName = (result?.product_name as string) || item.product_name;
+        const productName = (result?.product_name as string) || ci.product_name;
         throw new Error(
           `Insufficient stock for "${productName}". Only ${(result?.available ?? 0) as number} available.`,
         );
       }
 
-      deducted.push({ product_id: item.product_id, quantity: convertedQty });
+      deducted.push({ product_id: ci.product_id, quantity: ci.convertedQty });
     }
 
     return { success: true, orderNumber: createdOrder.order_number };

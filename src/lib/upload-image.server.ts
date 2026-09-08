@@ -1,5 +1,16 @@
 import { createServerFn } from "@tanstack/react-start";
 
+const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"];
+
+const MAX_BASE64_LENGTH = 10 * 1024 * 1024 * (4 / 3); // ~10MB decoded
+
+function sanitizeFileName(name: string): string {
+  return name
+    .replace(/[^a-zA-Z0-9._-]/g, "_")
+    .replace(/_{2,}/g, "_")
+    .slice(0, 200);
+}
+
 export const adminUploadImage = createServerFn({ method: "POST" })
   .validator((data: unknown) => {
     const d = data as Record<string, unknown>;
@@ -10,7 +21,19 @@ export const adminUploadImage = createServerFn({ method: "POST" })
     ) {
       throw new Error("Invalid upload data");
     }
-    return { fileName: d.fileName, base64: d.base64, contentType: d.contentType };
+    if (!ALLOWED_MIME_TYPES.includes(d.contentType)) {
+      throw new Error(
+        `Invalid file type: ${d.contentType}. Allowed: ${ALLOWED_MIME_TYPES.join(", ")}`,
+      );
+    }
+    if (d.base64.length > MAX_BASE64_LENGTH) {
+      throw new Error("File too large. Maximum size is 10MB.");
+    }
+    return {
+      fileName: sanitizeFileName(d.fileName),
+      base64: d.base64,
+      contentType: d.contentType,
+    };
   })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
