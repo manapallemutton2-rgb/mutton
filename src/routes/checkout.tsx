@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle, ArrowLeft, Bluetooth, MapPin, Home, FileText, Truck } from "lucide-react";
+import { CheckCircle, ArrowLeft, Bluetooth, MapPin, Home, FileText, Truck, MessageCircle } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { OrdersClosedBanner } from "@/components/OrdersClosedBanner";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +9,8 @@ import { CartItem, cartTotal, clearCart, getCart } from "@/lib/cart";
 import { getPhone, getName } from "@/lib/session";
 import { isPrinterConnected, printReceipt as btPrintReceipt } from "@/lib/bt-printer";
 import { placeOrderWithStockCheck } from "@/lib/place-order.server";
+import { sendOrderWhatsApp } from "@/lib/send-whatsapp.server";
+import { buildOrderThankYouMessage, buildShopWaLink } from "@/lib/whatsapp";
 
 type Community = { id: string; name: string };
 type Block = { id: string; community_id: string; name: string };
@@ -45,6 +47,8 @@ function CheckoutPage() {
   const [doneItems, setDoneItems] = useState<
     { product_name: string; unit: string; price: number; quantity: number }[]
   >([]);
+  const [waLink, setWaLink] = useState("");
+  const [waStatus, setWaStatus] = useState<"sending" | "sent" | "manual" | "failed">("sending");
 
   useEffect(() => {
     const update = () => {
@@ -143,12 +147,35 @@ function CheckoutPage() {
       return result.orderNumber;
     },
     onSuccess: (orderNumber) => {
-      clearCart();
-      setDone(orderNumber);
       const phone = getPhone();
       const customerName = getName() || "";
       const community = communities.find((c) => c.id === communityId);
       const block = blocks.find((b) => b.id === blockId);
+      const snapshotTotal = cartTotal(items);
+      const snapshotItems = items.map((i) => ({
+        product_name: i.name,
+        unit: i.unit,
+        price: i.price,
+        quantity: i.quantity,
+      }));
+      const orderInfo = {
+        order_number: orderNumber,
+        customer_name: customerName,
+        flat_no: flatNo,
+        phone: phone || "",
+        community_name: community?.name || "",
+        block_name: block?.name || "",
+        total: snapshotTotal,
+        packing_note: packingNote || null,
+      };
+      // Instant fallback link (works today, no API setup needed)
+      const fallbackMsg = buildOrderThankYouMessage(orderInfo, snapshotItems);
+      const fallbackLink = buildShopWaLink(fallbackMsg);
+      setWaLink(fallbackLink);
+      setWaStatus("sending");
+
+      clearCart();
+      setDone(orderNumber);
       setDoneOrder({
         id: orderNumber,
         order_number: orderNumber,
@@ -159,19 +186,34 @@ function CheckoutPage() {
         packing_note: packingNote || null,
         community_name: community?.name || "",
         block_name: block?.name || "",
-        total: cartTotal(items),
+        total: snapshotTotal,
         created_at: new Date().toISOString(),
       });
-      setDoneItems(
-        items.map((i) => ({
-          product_name: i.name,
-          unit: i.unit,
-          price: i.price,
-          quantity: i.quantity,
-        })),
-      );
+      setDoneItems(snapshotItems);
       queryClient.invalidateQueries({ queryKey: ["orders"] });
       queryClient.invalidateQueries({ queryKey: ["products", "active"] });
+
+      // Auto-send thank-you + order details to the CUSTOMER's WhatsApp number.
+      // If WHATSAPP_TOKEN is not configured on the server, this returns
+      // not-configured and the customer uses the one-tap button instead.
+      sendOrderWhatsApp({
+        data: {
+          phone: phone || "",
+          customer_name: customerName,
+          order_number: orderNumber,
+          flat_no: flatNo,
+          community_name: community?.name || "",
+          block_name: block?.name || "",
+          total: snapshotTotal,
+          packing_note: packingNote || null,
+          items: snapshotItems,
+        },
+      })
+        .then((res) => {
+          if (res.waLink) setWaLink(res.waLink);
+          setWaStatus(res.sent ? "sent" : res.reason === "not-configured" ? "manual" : "failed");
+        })
+        .catch(() => setWaStatus("failed"));
     },
     onError: (err: Error) => {
       setError(err.message);
@@ -249,6 +291,53 @@ function CheckoutPage() {
             <p className="mt-4 text-sm text-muted-foreground sm:text-base">
               Need help? Call us at <span className="font-semibold text-primary">9030 90 1233</span>
             </p>
+          </div>
+          {/* WhatsApp confirmation */}
+          <div className="mt-6 rounded-2xl border bg-card p-4 text-left sm:p-5">
+            <div className="flex items-center gap-2 font-semibold">
+              <MessageCircle className="h-5 w-5 text-green-600" />
+              WhatsApp confirmation
+            </div>
+            {waStatus === "sending" && (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Sending thank-you + bill to your WhatsApp…
+              </p>
+            )}
+            {waStatus === "sent" && (
+              <p className="mt-2 text-sm text-green-700">
+                ✅ Thank-you message with your order details has been sent to your WhatsApp
+                number ({doneOrder?.phone}).
+              </p>
+            )}
+            {(waStatus === "manual" || waStatus === "failed") && (
+              <>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {waStatus === "failed"
+                    ? "Auto-send failed — tap below to get your bill on WhatsApp:"
+                    : "Tap below to get your thank-you bill on WhatsApp:"}
+                </p>
+                {waLink && (
+                  <a
+                    href={waLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-6 py-3.5 text-base font-semibold text-white transition hover:brightness-95 active:scale-[0.98]"
+                  >
+                    <MessageCircle className="h-5 w-5" /> Get bill on WhatsApp
+                  </a>
+                )}
+              </>
+            )}
+            {waStatus === "sent" && waLink && (
+              <a
+                href={waLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 block text-center text-sm text-muted-foreground underline hover:text-foreground"
+              >
+                Open WhatsApp chat
+              </a>
+            )}
           </div>
           <div className="mt-8 flex flex-col gap-3 sm:mt-10 sm:gap-4">
             {doneOrder && (
