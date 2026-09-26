@@ -2480,43 +2480,62 @@ function ProductsTab() {
   const [subcategory, setSubcategory] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [uploadingNew, setUploadingNew] = useState(false);
+  const [formError, setFormError] = useState("");
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [newPriority, setNewPriority] = useState("");
   const [pendingPriorities, setPendingPriorities] = useState<Record<string, string>>({});
 
-  const { data: products = [], isLoading } = useQuery<Product[]>({
+  const {
+    data: products = [],
+    isLoading,
+    error: productsError,
+  } = useQuery<Product[]>({
     queryKey: ["admin", "products"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Try full column set first; fall back to minimal columns if the hosted DB
+      // is missing newer migrations (stock/priority/subcategory). Previously this
+      // returned [] silently and the shop looked empty.
+      const full = await supabase
         .from("products")
         .select(
           "id, name, unit, price, image_url, active, category, subcategory, created_at, stock, priority",
         )
         .order("priority", { ascending: true, nullsFirst: false });
-      if (error) {
-        console.error("Failed to load products:", error);
-        return [];
+      if (!full.error) return (full.data as Product[]) || [];
+      console.error("Failed to load products (full):", full.error);
+      const minimal = await supabase
+        .from("products")
+        .select("id, name, unit, price, image_url, active, category")
+        .order("name");
+      if (minimal.error) {
+        console.error("Failed to load products (minimal):", minimal.error);
+        throw minimal.error;
       }
-      return (data as Product[]) || [];
+      return ((minimal.data as Product[]) || []).map((p) => ({
+        ...p,
+        subcategory: null,
+        stock: null,
+        priority: null,
+      }));
     },
     staleTime: 300_000,
+    retry: 1,
   });
 
-  const { data: categories = [] } = useQuery<Category[]>({
+  const { data: categories = [], error: categoriesError } = useQuery<Category[]>({
     queryKey: ["admin", "categories"],
     queryFn: async () => {
       const { data, error } = await categoryQueryClient
         .from("categories")
         .select("id, name, slug, priority");
-      if (error) {
-        console.error("Failed to load product categories:", error);
-        return [];
-      }
+      if (error) throw error;
       return ((data as unknown as Category[]) || []).sort(
         (a, b) => (a.priority ?? Number.MAX_SAFE_INTEGER) - (b.priority ?? Number.MAX_SAFE_INTEGER),
       );
     },
     staleTime: 300_000,
+    retry: 1,
   });
 
   const filteredProducts =
@@ -2572,11 +2591,11 @@ function ProductsTab() {
           name: name.trim(),
           unit,
           price: Number(price),
-          stock: stock || null,
+          stock: stock.trim() === "" ? null : stock.trim(),
           image_url: imageUrl.trim() || null,
-          category,
+          category: category.trim().toLowerCase(),
           subcategory: subcategory || null,
-          priority: newPriority !== "" ? Number(newPriority) : null,
+          priority: newPriority.trim() === "" ? null : Number(newPriority),
         },
       });
     },
@@ -2584,17 +2603,43 @@ function ProductsTab() {
       setName("");
       setPrice("");
       setStock("");
-      setCategory(categoryOptions[0]?.slug || "");
+      // Keep the selected category so rapid multi-adds land in the right category.
       setSubcategory("");
       setImageUrl("");
       setNewPriority("");
+      setFormError("");
       queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
       queryClient.invalidateQueries({ queryKey: ["products", "active"] });
     },
     onError: (err: Error) => {
-      alert(err.message || "Failed to add product");
+      setFormError(err.message || "Failed to add product");
     },
   });
+
+  const uploadNewProductImage = async (file: File) => {
+    try {
+      setUploadingNew(true);
+      setFormError("");
+      const ext = file.name.split(".").pop() || "jpg";
+      const fileName = `new_${Date.now()}.${ext}`;
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string).split(",")[1]);
+        reader.onerror = () => reject(new Error("Failed to read file"));
+        reader.readAsDataURL(file);
+      });
+      const result = await adminUploadImage({
+        data: { fileName, base64, contentType: file.type || "image/jpeg" },
+      });
+      setImageUrl(result.publicUrl);
+    } catch (err: unknown) {
+      setFormError(
+        "Image upload failed: " + (err instanceof Error ? err.message : "Unknown error"),
+      );
+    } finally {
+      setUploadingNew(false);
+    }
+  };
 
   const toggleMutation = useMutation({
     mutationFn: async (p: Product) => {
@@ -2679,7 +2724,34 @@ function ProductsTab() {
 
   const add = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !price) return;
+    setFormError("");
+    if (!name.trim()) {
+      setFormError("Product name is required.");
+      return;
+    }
+    if (!category) {
+      setFormError("Please select a category first (add one in the Categories tab if empty).");
+      return;
+    }
+    const priceNum = Number(price);
+    if (!price.trim() || !Number.isFinite(priceNum) || priceNum <= 0) {
+      setFormError("Price must be a number greater than 0.");
+      return;
+    }
+    if (stock.trim() !== "") {
+      const stockNum = Number(stock);
+      if (!Number.isFinite(stockNum) || stockNum < 0) {
+        setFormError("Stock must be 0 or more (empty = unlimited).");
+        return;
+      }
+    }
+    if (newPriority.trim() !== "") {
+      const pNum = Number(newPriority);
+      if (!Number.isInteger(pNum) || pNum < 1) {
+        setFormError("Priority must be a positive whole number (1 = first).");
+        return;
+      }
+    }
     addMutation.mutate();
   };
 
@@ -2690,7 +2762,9 @@ function ProductsTab() {
   };
   const updatePrice = (p: Product, newPrice: string) => {
     const v = Number(newPrice);
-    if (!Number.isNaN(v)) updateProductMutation.mutate({ id: p.id, updates: { price: v } });
+    if (!Number.isFinite(v) || v <= 0) return;
+    if (v === p.price) return;
+    updateProductMutation.mutate({ id: p.id, updates: { price: v } });
   };
 
   const handleFileUpload = async (p: Product, file: File) => {
@@ -2738,6 +2812,23 @@ function ProductsTab() {
 
   return (
     <div>
+      {productsError && (
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          Failed to load products: {(productsError as Error).message}. Check Supabase migrations and
+          env vars.
+        </div>
+      )}
+      {categoriesError && (
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          Failed to load categories: {(categoriesError as Error).message}. Products cannot be added
+          until categories load.
+        </div>
+      )}
+      {formError && (
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
+          {formError}
+        </div>
+      )}
       <form
         onSubmit={add}
         className="mb-5 grid gap-3 rounded-xl border bg-card p-4 sm:p-6 sm:grid-cols-2 lg:grid-cols-8"
@@ -2824,8 +2915,26 @@ function ProductsTab() {
           type="url"
           className="rounded-xl border bg-background px-4 py-4 text-base"
         />
+        <label className="flex cursor-pointer items-center justify-center rounded-xl border bg-background px-4 py-4 text-base font-medium hover:bg-muted">
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) uploadNewProductImage(file);
+              e.target.value = "";
+            }}
+          />
+          {uploadingNew ? "Uploading..." : imageUrl ? "Replace upload" : "Upload image"}
+        </label>
+        {categoryOptions.length === 0 && (
+          <p className="text-sm text-red-600 sm:col-span-2 lg:col-span-8">
+            No categories found — add one in the Categories tab before adding products.
+          </p>
+        )}
         <button
-          disabled={addMutation.isPending}
+          disabled={addMutation.isPending || uploadingNew}
           className="rounded-xl bg-primary py-4 text-base font-medium text-primary-foreground disabled:opacity-50"
         >
           {addMutation.isPending ? "Adding..." : "Add Product"}

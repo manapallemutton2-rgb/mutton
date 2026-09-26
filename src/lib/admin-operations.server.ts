@@ -14,35 +14,59 @@ export const adminUpdateProduct = createServerFn({ method: "POST" })
   .validator((data: unknown) => {
     const d = data as Record<string, unknown>;
     if (typeof d.id !== "string") throw new Error("Invalid product id");
+    const updates = { ...(d.updates as Record<string, unknown>) };
+    // Sanitize + validate partial updates so bad input fails fast with a clear message.
+    if (updates.name !== undefined) {
+      const name = String(updates.name || "").trim();
+      if (!name) throw new Error("Product name is required");
+      updates.name = name;
+    }
+    if (updates.price !== undefined) {
+      const price = Number(updates.price);
+      if (!Number.isFinite(price) || price <= 0)
+        throw new Error("Price must be a number greater than 0");
+      updates.price = price;
+    }
+    if (updates.stock !== undefined) {
+      if (updates.stock === "" || updates.stock === null) {
+        updates.stock = null;
+      } else {
+        const stock = Number(updates.stock);
+        if (!Number.isFinite(stock) || stock < 0)
+          throw new Error("Stock must be 0 or more (empty = unlimited)");
+        updates.stock = stock;
+      }
+    }
+    if (updates.priority !== undefined) {
+      if (updates.priority === "" || updates.priority === null) {
+        updates.priority = null;
+      } else {
+        const priority = Number(updates.priority);
+        if (!Number.isInteger(priority) || priority < 1)
+          throw new Error("Priority must be a positive whole number (1 = first)");
+        updates.priority = priority;
+      }
+    }
+    if (updates.category !== undefined) {
+      const category = String(updates.category || "")
+        .trim()
+        .toLowerCase();
+      if (!category) throw new Error("Category is required");
+      updates.category = category;
+    }
+    if (updates.subcategory !== undefined) {
+      updates.subcategory = updates.subcategory ? String(updates.subcategory) : null;
+    }
     return {
       id: d.id,
-      updates: d.updates as Record<string, unknown>,
+      updates,
     };
   })
   .handler(async ({ data }) => {
     const admin = await getAdminClient();
 
-    if (data.updates.priority !== undefined && data.updates.priority !== null) {
-      const { data: product } = await admin
-        .from("products")
-        .select("category")
-        .eq("id", data.id)
-        .single();
-      if (product) {
-        const { data: existing } = await admin
-          .from("products")
-          .select("id")
-          .eq("category", product.category)
-          .eq("priority", Number(data.updates.priority))
-          .neq("id", data.id)
-          .limit(1);
-        if (existing && existing.length > 0) {
-          throw new Error(
-            `Priority ${data.updates.priority} is already used by another product in "${product.category}"`,
-          );
-        }
-      }
-    }
+    // NOTE: duplicate priorities are allowed (sorted stably by priority, then name).
+    // Previously this threw and blocked saving — that was the #1 "cannot add/edit product" complaint.
 
     const { error } = await admin
       .from("products")
@@ -68,38 +92,70 @@ export const adminDeleteProduct = createServerFn({ method: "POST" })
 export const adminInsertProduct = createServerFn({ method: "POST" })
   .validator((data: unknown) => {
     const d = data as Record<string, unknown>;
-    const stock = d.stock !== undefined && d.stock !== "" ? Number(d.stock) : null;
-    const priority = d.priority !== undefined && d.priority !== "" ? Number(d.priority) : null;
+    const name = String(d.name || "").trim();
+    if (!name) throw new Error("Product name is required");
+    const category = String(d.category || "")
+      .trim()
+      .toLowerCase();
+    if (!category) throw new Error("Category is required — please select a category");
+    const price = Number(d.price);
+    if (!Number.isFinite(price) || price <= 0)
+      throw new Error("Price must be a number greater than 0");
+    const allowedUnits = ["kg", "dozen", "piece", "tray"];
+    const unit = String(d.unit || "kg");
+    if (!allowedUnits.includes(unit))
+      throw new Error(`Invalid unit. Allowed: ${allowedUnits.join(", ")}`);
+    let stock: number | null = null;
+    if (d.stock !== undefined && d.stock !== "" && d.stock !== null) {
+      stock = Number(d.stock);
+      if (!Number.isFinite(stock) || stock < 0)
+        throw new Error("Stock must be 0 or more (empty = unlimited)");
+    }
+    let priority: number | null = null;
+    if (d.priority !== undefined && d.priority !== "" && d.priority !== null) {
+      priority = Number(d.priority);
+      if (!Number.isInteger(priority) || priority < 1)
+        throw new Error("Priority must be a positive whole number (1 = first)");
+    }
     return {
-      name: String(d.name || ""),
-      unit: String(d.unit || "kg"),
-      price: Number(d.price),
+      name,
+      unit,
+      price,
       image_url: d.image_url ? String(d.image_url) : null,
-      stock: stock,
+      stock,
       active: true,
-      category: String(d.category || "mutton"),
+      category,
       subcategory: d.subcategory ? String(d.subcategory) : null,
-      priority: priority,
+      priority,
     };
   })
   .handler(async ({ data }) => {
     const admin = await getAdminClient();
 
-    if (data.priority != null) {
+    // Auto-resolve priority collisions instead of throwing: previously any reused
+    // priority blocked the insert with "already used". Now bump to max+1 in category.
+    let insertData = { ...data };
+    if (insertData.priority != null) {
       const { data: existing } = await admin
         .from("products")
         .select("id")
-        .eq("category", data.category)
-        .eq("priority", data.priority)
+        .eq("category", insertData.category)
+        .eq("priority", insertData.priority)
         .limit(1);
       if (existing && existing.length > 0) {
-        throw new Error(
-          `Priority ${data.priority} is already used by another product in "${data.category}"`,
+        const { data: siblings } = await admin
+          .from("products")
+          .select("priority")
+          .eq("category", insertData.category);
+        const max = Math.max(
+          0,
+          ...((siblings as { priority: number | null }[] | null) || []).map((s) => s.priority ?? 0),
         );
+        insertData = { ...insertData, priority: max + 1 };
       }
     }
 
-    const { error } = await admin.from("products").insert(data);
+    const { error } = await admin.from("products").insert(insertData);
     if (error) throw new Error(error.message);
     return { success: true };
   });
@@ -239,19 +295,7 @@ export const adminInsertSubcategory = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const admin = await getAdminClient();
 
-    if (data.priority != null) {
-      const { data: existing } = await admin
-        .from("subcategories")
-        .select("id")
-        .eq("category_slug", data.category_slug)
-        .eq("priority", data.priority)
-        .limit(1);
-      if (existing && existing.length > 0) {
-        throw new Error(
-          `Priority ${data.priority} is already used by another subcategory in "${data.category_slug}"`,
-        );
-      }
-    }
+    // Allow duplicate priorities (sorted stably) — previously blocked inserts.
 
     const { error } = await admin.from("subcategories").insert(data);
     if (error) throw new Error(error.message);
@@ -276,27 +320,7 @@ export const adminUpdateSubcategory = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const admin = await getAdminClient();
 
-    if (data.updates.priority !== undefined && data.updates.priority !== null) {
-      const { data: sub } = await admin
-        .from("subcategories")
-        .select("category_slug")
-        .eq("id", data.id)
-        .single();
-      if (sub) {
-        const { data: existing } = await admin
-          .from("subcategories")
-          .select("id")
-          .eq("category_slug", sub.category_slug)
-          .eq("priority", Number(data.updates.priority))
-          .neq("id", data.id)
-          .limit(1);
-        if (existing && existing.length > 0) {
-          throw new Error(
-            `Priority ${data.updates.priority} is already used by another subcategory in "${sub.category_slug}"`,
-          );
-        }
-      }
-    }
+    // Allow duplicate priorities — previously blocked saves.
 
     const { error } = await admin
       .from("subcategories")

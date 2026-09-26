@@ -39,6 +39,24 @@ const FALLBACK_META = {
   image: undefined as string | undefined,
 };
 
+function prettifySlug(slug: string): string {
+  return slug
+    .split("-")
+    .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+    .join(" ");
+}
+
+function sortProductsByPriority<T extends { priority?: number | null; name: string }>(
+  list: T[],
+): T[] {
+  return [...list].sort((a, b) => {
+    const pa = a.priority ?? 9999;
+    const pb = b.priority ?? 9999;
+    if (pa !== pb) return pa - pb;
+    return a.name.localeCompare(b.name);
+  });
+}
+
 export const Route = createFileRoute("/shop")({
   component: ShopPage,
   head: () => ({ meta: [{ title: "Shop - Manapalle Products" }] }),
@@ -65,39 +83,62 @@ function ShopPage() {
   const matches = useMatches();
   const hasChild = matches.some((m) => m.routeId === "/shop/$category");
 
-  const { data: products = [], isLoading } = useQuery<Product[]>({
+  const {
+    data: products = [],
+    isLoading,
+    error: productsError,
+  } = useQuery<Product[]>({
     queryKey: ["products", "active"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const full = await supabase
         .from("products")
         .select("id, name, unit, price, image_url, active, category, stock, priority")
         .eq("active", true);
-      if (error) {
-        console.error("Failed to load products:", error);
-        return [];
-      }
-      return ((data as Product[]) || []).sort((a, b) => {
-        const pa = a.priority ?? 9999;
-        const pb = b.priority ?? 9999;
-        return pa - pb;
-      });
+      if (!full.error)
+        return sortProductsByPriority(
+          ((full.data as Product[]) || []).map((p) => ({
+            ...p,
+            category: String(p.category || "").toLowerCase(),
+          })),
+        );
+      console.error("Failed to load products (full):", full.error);
+      // Fallback for DBs missing newer columns (stock/priority).
+      const minimal = await supabase
+        .from("products")
+        .select("id, name, unit, price, image_url, active, category")
+        .eq("active", true);
+      if (minimal.error) throw minimal.error;
+      return sortProductsByPriority(
+        ((minimal.data as Product[]) || []).map((p) => ({
+          ...p,
+          category: String(p.category || "").toLowerCase(),
+          stock: null,
+          priority: null,
+        })),
+      );
     },
-    staleTime: 60_000,
+    staleTime: 30_000,
+    retry: 1,
   });
 
-  const { data: publicCategories = [], isLoading: loadingCategories } = useQuery<PublicCategory[]>({
+  const {
+    data: publicCategories = [],
+    isLoading: loadingCategories,
+    error: categoriesError,
+  } = useQuery<PublicCategory[]>({
     queryKey: ["categories", "public"],
     queryFn: async () => {
       const { data, error } = await publicCategoryQueryClient
         .from("categories")
         .select("name, slug, image_url, priority");
-      if (error) {
-        console.error("Failed to load public categories:", error);
-        return [];
-      }
-      return (data as unknown as PublicCategory[]) || [];
+      if (error) throw error;
+      return ((data as unknown as PublicCategory[]) || []).map((c) => ({
+        ...c,
+        slug: String(c.slug || "").toLowerCase(),
+      }));
     },
     staleTime: 60_000,
+    retry: 1,
   });
 
   const categories = Array.from(
@@ -106,6 +147,7 @@ function ShopPage() {
       ...products.map((product) => product.category),
     ]),
   )
+    .map((s) => String(s || "").toLowerCase())
     .filter(Boolean)
     .sort((a, b) => {
       const aCategory = publicCategories.find((category) => category.slug === a);
@@ -128,10 +170,11 @@ function ShopPage() {
     const fallback = FALLBACK_META;
     return {
       ...fallback,
-      label: category?.name || fallback.label,
+      label: category?.name || prettifySlug(cat) || fallback.label,
       image: category?.image_url || fallback.image,
     };
   };
+  const loadError = productsError || categoriesError;
 
   if (hasChild) {
     return (
@@ -344,6 +387,12 @@ function ShopPage() {
         <div id="category-grid" className="mt-2">
           <h2 className="mb-3 text-lg font-bold text-foreground sm:text-xl">Choose a Category</h2>
 
+          {loadError && (
+            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              Failed to load shop data: {(loadError as Error).message}. Check internet, Supabase env
+              vars and migrations.
+            </div>
+          )}
           {isLoading || loadingCategories ? (
             <div className="flex gap-4 overflow-hidden">
               {[1, 2, 3, 4].map((i) => (

@@ -52,6 +52,13 @@ function getCategorySizeOptions(categorySlug: string, productName: string) {
 
 const FALLBACK_META = { label: "Category", color: "#145B42", bg: "#F3F4F6", image: undefined };
 
+function prettifySlug(slug: string): string {
+  return String(slug || "")
+    .split("-")
+    .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+    .join(" ");
+}
+
 export const Route = createFileRoute("/shop/$category")({
   component: CategoryPage,
   head: ({ params }) => {
@@ -67,28 +74,33 @@ function CategoryPage() {
   const [search, setSearch] = useState("");
   const [showClosedPopup, setShowClosedPopup] = useState(false);
 
-  const { data: categoryRows = [] } = useQuery<PublicCategory[]>({
+  const { data: categoryRows = [], error: categoriesError } = useQuery<PublicCategory[]>({
     queryKey: ["categories", "public"],
     queryFn: async () => {
       const { data, error } = await (supabase as unknown as PublicCategoryQueryClient)
         .from("categories")
         .select("name, slug, image_url");
-      if (error) return [];
-      return (data as unknown as PublicCategory[]) || [];
+      if (error) throw error;
+      return ((data as unknown as PublicCategory[]) || []).map((c) => ({
+        ...c,
+        slug: String(c.slug || "").toLowerCase(),
+      }));
     },
     staleTime: 60_000,
+    retry: 1,
   });
 
-  const publicCategory = categoryRows.find((item) => item.slug === category);
+  const categorySlug = String(category || "").toLowerCase();
+  const publicCategory = categoryRows.find((item) => item.slug === categorySlug);
   const fallbackMeta = FALLBACK_META;
   const catMeta = {
     ...fallbackMeta,
-    label: publicCategory?.name || fallbackMeta.label,
+    label: publicCategory?.name || prettifySlug(categorySlug) || fallbackMeta.label,
     image: publicCategory?.image_url || fallbackMeta.image,
   };
 
   const { data: publicSubcategories = [] } = useQuery<PublicSubcategory[]>({
-    queryKey: ["subcategories", "public", category],
+    queryKey: ["subcategories", "public", categorySlug],
     queryFn: async () => {
       const { data, error } = await (
         supabase as unknown as {
@@ -99,9 +111,13 @@ function CategoryPage() {
       )
         .from("subcategories")
         .select("name, slug, category_slug, priority");
-      if (error) return [];
+      if (error) {
+        // Subcategories are optional — missing table should not break product display.
+        console.error("Failed to load subcategories:", error);
+        return [];
+      }
       return ((data as unknown as PublicSubcategory[]) || [])
-        .filter((item) => item.category_slug === category)
+        .filter((item) => String(item.category_slug || "").toLowerCase() === categorySlug)
         .sort(
           (a, b) =>
             (a.priority ?? Number.MAX_SAFE_INTEGER) - (b.priority ?? Number.MAX_SAFE_INTEGER),
@@ -139,24 +155,47 @@ function CategoryPage() {
 
   const ordersOpen = settings.orders_open !== "false";
 
-  const { data: products = [], isLoading } = useQuery<Product[]>({
+  const {
+    data: products = [],
+    isLoading,
+    error: productsError,
+  } = useQuery<Product[]>({
     queryKey: ["products", "active"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const full = await supabase
         .from("products")
         .select("id, name, unit, price, image_url, active, category, subcategory, stock, priority")
         .eq("active", true);
-      if (error) {
-        console.error("Failed to load products:", error);
-        return [];
-      }
-      return ((data as Product[]) || []).sort((a, b) => {
-        const pa = a.priority ?? 9999;
-        const pb = b.priority ?? 9999;
-        return pa - pb;
-      });
+      if (!full.error)
+        return (
+          ((full.data as Product[]) || []).map((p) => ({
+            ...p,
+            category: String(p.category || "").toLowerCase(),
+          })) as Product[]
+        ).sort((a, b) => {
+          const pa = a.priority ?? 9999;
+          const pb = b.priority ?? 9999;
+          if (pa !== pb) return pa - pb;
+          return a.name.localeCompare(b.name);
+        });
+      console.error("Failed to load products (full):", full.error);
+      const minimal = await supabase
+        .from("products")
+        .select("id, name, unit, price, image_url, active, category")
+        .eq("active", true);
+      if (minimal.error) throw minimal.error;
+      return (
+        ((minimal.data as Product[]) || []).map((p) => ({
+          ...p,
+          category: String(p.category || "").toLowerCase(),
+          subcategory: null,
+          stock: null,
+          priority: null,
+        })) as Product[]
+      ).sort((a, b) => a.name.localeCompare(b.name));
     },
-    staleTime: 60_000,
+    staleTime: 30_000,
+    retry: 1,
   });
 
   const queryClient = useQueryClient();
@@ -174,17 +213,19 @@ function CategoryPage() {
   }, [queryClient]);
 
   const cartCount = getCart().reduce((s, i) => s + i.quantity, 0);
+  const loadError = productsError || categoriesError;
 
   const filtered = products
     .filter((p) => {
-      const matchesCategory = p.category === category;
+      const matchesCategory = String(p.category || "").toLowerCase() === categorySlug;
       const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase());
       return matchesCategory && matchesSearch;
     })
     .sort((a, b) => {
       const pa = a.priority ?? 9999;
       const pb = b.priority ?? 9999;
-      return pa - pb;
+      if (pa !== pb) return pa - pb;
+      return a.name.localeCompare(b.name);
     });
 
   const add = (p: Product, sizeLabel: string, sizePrice: number) => {
@@ -213,6 +254,11 @@ function CategoryPage() {
       <AppHeader title={catMeta.label} />
       <main className="mx-auto max-w-6xl px-3 py-4 sm:px-4 sm:py-6">
         <OrdersClosedBanner />
+        {loadError && (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            Failed to load products: {(loadError as Error).message}
+          </div>
+        )}
         {/* ORDERS CLOSED POPUP */}
         {showClosedPopup && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-6">
@@ -330,7 +376,14 @@ function CategoryPage() {
                 className="rounded-full border border-primary/20 bg-primary/5 px-3 py-1.5 text-sm font-medium text-primary"
               >
                 {subcategory.name} (
-                {filtered.filter((p) => p.subcategory === subcategory.slug).length})
+                {
+                  filtered.filter(
+                    (p) =>
+                      String(p.subcategory || "").toLowerCase() ===
+                      String(subcategory.slug || "").toLowerCase(),
+                  ).length
+                }
+                )
               </span>
             ))}
           </div>
@@ -361,7 +414,7 @@ function CategoryPage() {
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
             {filtered.map((p, idx) => {
-              const sizes = hasSizes(p) ? getCategorySizeOptions(category, p.name) : null;
+              const sizes = hasSizes(p) ? getCategorySizeOptions(categorySlug, p.name) : null;
               return (
                 <div key={p.id} className="contents">
                   {p.subcategory &&
