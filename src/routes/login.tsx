@@ -3,6 +3,7 @@ import { useState } from "react";
 import { User, Phone, ArrowRight } from "lucide-react";
 import { setSession, getRole } from "@/lib/session";
 import { AboutSection } from "@/components/AboutSection";
+import { PosterPopup } from "@/components/PosterPopup";
 
 export const Route = createFileRoute("/login")({
   beforeLoad: () => {
@@ -36,6 +37,7 @@ function LoginPage() {
 
   return (
     <div className="flex min-h-screen">
+      <PosterPopup />
       {/* Left: About Us (desktop) */}
       <div className="hidden w-1/2 overflow-y-auto p-10 lg:block">
         <AboutSection />

@@ -6,6 +6,7 @@ import { getPhone, getRole } from "@/lib/session";
 import { AppHeader } from "@/components/AppHeader";
 import { OrdersClosedBanner } from "@/components/OrdersClosedBanner";
 import { AboutSection } from "@/components/AboutSection";
+import { PosterPopup } from "@/components/PosterPopup";
 
 type Product = {
   id: string;
@@ -186,6 +187,7 @@ function ShopPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <PosterPopup />
       <AppHeader title="Shop" />
       <main className="mx-auto max-w-6xl px-3 py-4 sm:px-4 sm:py-6">
         <OrdersClosedBanner />
