@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { User, Phone, ArrowRight } from "lucide-react";
 import { setSession, getRole } from "@/lib/session";
-import { AboutSection } from "@/components/AboutSection";
+import { PosterSection } from "@/components/PosterSection";
 import { PosterPopup } from "@/components/PosterPopup";
 
 export const Route = createFileRoute("/login")({
@@ -40,7 +40,7 @@ function LoginPage() {
       <PosterPopup />
       {/* Left: About Us (desktop) */}
       <div className="hidden w-1/2 overflow-y-auto p-10 lg:block">
-        <AboutSection />
+        <PosterSection />
         <div className="mt-4 space-y-1 rounded-xl bg-muted/30 px-5 py-4 text-sm text-muted-foreground">
           <p>Village Gungal, Yacharam Mandal,</p>
           <p>K.V.Rangareddy District - 501506</p>
@@ -149,7 +149,7 @@ function LoginPage() {
 
           {/* About Us (mobile) */}
           <div className="mt-10 lg:hidden">
-            <AboutSection />
+            <PosterSection />
             <div className="mt-4 space-y-1 rounded-xl bg-muted/30 px-5 py-4 text-sm text-muted-foreground">
               <p>Village Gungal, Yacharam Mandal,</p>
               <p>K.V.Rangareddy District - 501506</p>

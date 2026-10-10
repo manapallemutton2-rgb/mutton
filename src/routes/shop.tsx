@@ -5,8 +5,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { getPhone, getRole } from "@/lib/session";
 import { AppHeader } from "@/components/AppHeader";
 import { OrdersClosedBanner } from "@/components/OrdersClosedBanner";
-import { AboutSection } from "@/components/AboutSection";
 import { PosterPopup } from "@/components/PosterPopup";
+import { PosterSection } from "@/components/PosterSection";
 
 type Product = {
   id: string;
@@ -203,14 +203,16 @@ function ShopPage() {
             </svg>
           </div>
           <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
-            <div className="flex flex-row items-center justify-between gap-4 py-6 sm:gap-8 sm:py-10 lg:gap-12">
+            <div className="pt-5 sm:pt-10">
+              <span
+                className="inline-flex max-w-full items-center whitespace-nowrap rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider sm:px-4 sm:py-1.5 sm:text-xs"
+                style={{ backgroundColor: "#145B42", color: "#F4EAD5" }}
+              >
+                Village-raised, home-delivered
+              </span>
+            </div>
+            <div className="flex flex-row items-center justify-between gap-3 py-4 sm:gap-8 sm:py-10 lg:gap-12">
               <div className="min-w-0 flex-1">
-                <span
-                  className="mb-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider sm:mb-4 sm:px-4 sm:py-1.5 sm:text-xs"
-                  style={{ backgroundColor: "#145B42", color: "#F4EAD5" }}
-                >
-                  Village-raised, home-delivered
-                </span>
                 <h1
                   className="text-xl font-bold leading-tight sm:text-4xl lg:text-6xl"
                   style={{ color: "#145B42" }}
@@ -479,8 +481,8 @@ function ShopPage() {
             </>
           )}
         </div>
-        <section className="mx-auto mt-8 max-w-3xl">
-          <AboutSection />
+        <section className="mx-auto mt-6 max-w-4xl">
+          <PosterSection />
         </section>
       </main>
     </div>

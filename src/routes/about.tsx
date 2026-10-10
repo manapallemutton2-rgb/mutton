@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AppHeader } from "@/components/AppHeader";
 import { OrdersClosedBanner } from "@/components/OrdersClosedBanner";
-import { AboutSection } from "@/components/AboutSection";
+import { PosterSection } from "@/components/PosterSection";
 
 export const Route = createFileRoute("/about")({
   component: AboutPage,
@@ -12,9 +12,9 @@ function AboutPage() {
   return (
     <div className="min-h-screen bg-background">
       <AppHeader title="About Us" />
-      <main className="mx-auto max-w-2xl px-4 py-8 sm:py-12">
+      <main className="mx-auto max-w-4xl px-4 py-8 sm:py-12">
         <OrdersClosedBanner />
-        <AboutSection />
+        <PosterSection />
         <div className="mt-4 space-y-1 rounded-xl bg-muted/30 px-5 py-4 text-sm text-muted-foreground">
           <p>Village Gungal, Yacharam Mandal,</p>
           <p>K.V.Rangareddy District - 501506</p>
